@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Card } from '@deck-designer/core';
-import { DEFAULT_NAME_PATTERN, formatName, validateNamePattern } from '../src/naming.js';
+import { DEFAULT_NAME_PATTERN, formatName } from '../src/naming.js';
 
 function card(id: string, type = 'creature'): Card {
   return {
@@ -39,8 +39,9 @@ describe('filename patterns', () => {
     ).toBe('etc/passwd.png');
   });
 
-  it('rejects a pattern that would collapse every component onto one file', () => {
-    expect(() => validateNamePattern('{type}/{face}.png')).toThrow(/overwrite/);
-    expect(() => validateNamePattern('{type}/{id}.png')).not.toThrow();
+  it('allows a constant name, because one shared back is a real case', () => {
+    // Whether a pattern is safe depends on how many faces it is asked to name,
+    // so the check lives where the files are written, not here.
+    expect(formatName('back.png', { card: card('x'), face: 'back', index: 1, indexWidth: 1 })).toBe('back.png');
   });
 });

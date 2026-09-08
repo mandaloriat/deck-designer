@@ -62,8 +62,17 @@ build that renders differently next month.
 Name pattern tokens: `{id}`, `{type}`, `{face}`, `{name}` (the slugified `idFrom`
 field, falling back to the id) and `{index}`, which is 1-based within a component
 type and zero-padded to a fixed width so a directory listing sorts in project
-order. A pattern with none of `{id}`, `{name}` or `{index}` is rejected, since
-every component would overwrite the previous one.
+order.
+
+A constant name with no token is allowed when the selection resolves to a single
+face, which is how you write one shared back. If two faces would land on the same
+file the export stops before writing anything, naming both.
+
+That combination is what a virtual tabletop wants: a folder of faces plus one
+back, discovered by filename rather than listed in a config.
+
+    deck export -p my-deck --face front --name 'front-{id}.png' --out table/my-deck
+    deck export -p my-deck --face back --id <one-card> --name 'back.png' --out table/my-deck
 
 ## deck init [dir]
 

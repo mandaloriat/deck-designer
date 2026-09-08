@@ -3,7 +3,7 @@ import path from 'node:path';
 import { findCardType, type Card, type Diagnostic, type Face, type Project } from '@deck-designer/core';
 import { DeckRenderer, type RenderFlags } from '@deck-designer/render';
 import { compose } from './select.js';
-import { formatName, validateNamePattern, type NameContext } from './naming.js';
+import { formatName, type NameContext } from './naming.js';
 import type { Reporter } from './output.js';
 
 export interface WrittenImage {
@@ -37,8 +37,6 @@ export async function renderToDisk(
   options: RenderToDiskOptions,
   reporter: Reporter,
 ): Promise<{ files: WrittenImage[]; diagnostics: Diagnostic[]; dpi: number }> {
-  validateNamePattern(options.pattern);
-
   const composed = await compose(options.project, options.cards, options.faces);
   reporter.step(`Composed ${composed.length} face(s) from ${options.cards.length} component(s)`);
 
@@ -51,12 +49,30 @@ export async function renderToDisk(
   try {
     const { images, diagnostics } = await renderer.renderImages(composed, options.flags);
     const context = nameContexts(options.project, options.cards);
-    const files: WrittenImage[] = [];
-
-    for (const image of images) {
+    // Judge the outcome, not the pattern: a constant name is exactly right when
+    // one face is being written (a deck's single shared back), and wrong only
+    // when two would land on the same path. Resolved before anything is written,
+    // so a clash does not leave half a directory behind.
+    const planned = images.flatMap((image) => {
       const base = context.get(image.cardId);
-      if (!base) continue;
-      const relative = formatName(options.pattern, { ...base, face: image.face });
+      return base ? [{ image, relative: formatName(options.pattern, { ...base, face: image.face }) }] : [];
+    });
+
+    const claimed = new Map<string, string>();
+    for (const { image, relative } of planned) {
+      const owner = `${image.cardId} (${image.face})`;
+      const previous = claimed.get(relative);
+      if (previous !== undefined) {
+        throw new Error(
+          `Both ${previous} and ${owner} would be written to "${relative}". ` +
+            'Add {id}, {name}, {index} or {face} to --name, or narrow the selection.',
+        );
+      }
+      claimed.set(relative, owner);
+    }
+
+    const files: WrittenImage[] = [];
+    for (const { image, relative } of planned) {
       const file = path.join(options.outDir, relative);
       await fs.mkdir(path.dirname(file), { recursive: true });
       await fs.writeFile(file, image.buffer);
