@@ -9,6 +9,7 @@ import { printPlanCommand } from './commands/print-plan.js';
 import { initCommand } from './commands/init.js';
 import { doctorCommand } from './commands/doctor.js';
 import { watchCommand } from './commands/watch.js';
+import { previewCommand } from './commands/preview.js';
 import { pageFormatNames } from './geometry.js';
 
 const VERSION = '0.1.0';
@@ -130,6 +131,16 @@ withSelection(
   .option('--command <name>', 'the print-cards executable to call', 'print-cards')
   .action(async (options, command: Command) => {
     await run('print-plan', command, (reporter) => printPlanCommand(options, reporter));
+  });
+
+program
+  .command('preview')
+  .description('serve a live view of the deck in a browser')
+  .option('-p, --project <path>', 'project directory or deck.yaml')
+  .option('--port <number>', 'port to listen on', (v) => Number.parseInt(v, 10), 4321)
+  .option('--host <host>', 'interface to bind (anything but loopback exposes the project)', '127.0.0.1')
+  .action(async (options, command: Command) => {
+    await run('preview', command, (reporter) => previewCommand(options, reporter));
   });
 
 withRender(withSelection(program.command('watch').description('rebuild on file changes'))).action(

@@ -145,10 +145,39 @@ transparent placeholder, because print-cards drops to interactive prompts unless
 every position is accounted for, and because keeping the grid identical across
 sheets is what makes pre-cut stock line up.
 
+## deck preview
+
+A live view of the deck in a browser, reloading on save.
+
+    -p, --project <path>   project directory or deck.yaml
+    --port <number>        port to listen on (default 4321)
+    --host <host>          interface to bind (default 127.0.0.1)
+
+    deck preview -p examples/briscola
+
+The toolbar controls map to flags `deck export` already has — zoom, faces,
+component type, bleed, guides, rounded corners, and a filter by id — so what
+you settle on in the preview is what you pass to the exporter.
+
+Two things make it a preview rather than an impression. The deck renders inside
+an iframe carrying the same document the exporter composes, so no stylesheet of
+yours can reach the toolbar and nothing of the toolbar's leaks into your cards.
+And zoom is applied as resolution rather than as a transform, so layout is
+recomputed at the new scale exactly as it would be at 600dpi.
+
+The diagnostics drawer shows what `deck validate` would report, live. A broken
+`deck.yaml` shows the parser error with its line and column instead of a blank
+page.
+
+It is a viewer, not an editor: the files stay the source of truth. Bind it to
+loopback unless you mean to expose the project directory, because it serves
+that directory over HTTP.
+
 ## deck watch
 
-Rebuilds on any change under the project directory, ignoring `dist/`,
-`node_modules/` and `.git/`.
+Rebuilds the PNGs on any change under the project directory, ignoring `dist/`,
+`node_modules/` and `.git/`. Use it when something downstream consumes the
+files; use `deck preview` when you are the one looking.
 
 ## deck doctor
 

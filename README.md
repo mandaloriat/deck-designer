@@ -48,6 +48,10 @@ into an exact pixel frame instead of being screenshotted at a fractional size.
 fonts must be vendored into the project, and the renderer pins colour profile,
 locale, timezone and font hinting. A build that works on your laptop works in CI.
 
+**A design loop.** `deck preview` serves the deck in a browser and reloads on
+save, rendering the same document the exporter composes rather than an
+approximation of it, with the validator's diagnostics live alongside.
+
 **Machine-readable everything.** Every command takes `--json` and returns a stable
 envelope with diagnostics carrying error codes. Exit codes distinguish a crash (1)
 from a project that failed validation (2).
@@ -59,6 +63,7 @@ from a project that failed validation (2).
     deck cards             list the components, filtered by type, id or field value
     deck build             render everything, write a manifest
     deck export            render a selection to PNG
+    deck preview           live view in a browser, reloading on save
     deck print-plan        lay the PNGs onto sheets for printing
     deck watch             rebuild on change
     deck doctor            check the toolchain
@@ -86,12 +91,17 @@ drive something else with it.
 
 ## Examples
 
-`examples/starter-deck` is what `deck init` writes: a card type and a token
-type, to show that a component is only a size, a template and some rows.
+[`examples/briscola`](examples/briscola) is a complete 40-card Italian deck with
+original artwork, built to put weight on the tool rather than to demonstrate it.
+One CSV, one template, one SVG per suit used at four sizes in four colours.
 
-`examples/briscola` is a complete 40-card Italian deck with original artwork,
-built to put weight on the tool rather than to demonstrate it. Loops, masks,
-a vendored font, two render batches, ten print sheets.
+| | | | |
+|:---:|:---:|:---:|:---:|
+| ![Asso di denari](examples/briscola/preview/denari-01.png) | ![Sette di spade](examples/briscola/preview/spade-07.png) | ![Re di spade](examples/briscola/preview/spade-10.png) | ![Dorso](examples/briscola/preview/bastoni-01.back.png) |
+
+[`examples/starter-deck`](examples/starter-deck) is what `deck init` writes: a
+card type and a token type, to show that a component is only a size, a template
+and some rows.
 
 ## A project
 
