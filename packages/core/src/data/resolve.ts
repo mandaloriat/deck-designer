@@ -48,6 +48,31 @@ export async function resolveCards(project: Project, options: ResolveOptions = {
     for (const row of rows) {
       const file = projectRelative(project.root, row.file);
       const merged: Record<string, unknown> = { ...type.defaults, ...normaliseKeys(row.values) };
+
+      if (row.body !== undefined) {
+        if (type.bodyField === undefined) {
+          diagnostics.push(
+            diag('warning', 'data/body-ignored', `Body text ignored: no field to put it in.`, {
+              file,
+              cardType: type.id,
+              hint: `Add \`body: <field>\` to card type "${type.id}", or give it exactly one richtext field.`,
+            }),
+          );
+        } else {
+          if (!isEmpty(merged[type.bodyField])) {
+            diagnostics.push(
+              diag(
+                'warning',
+                'data/body-conflict',
+                `"${type.bodyField}" is set in the front matter and in the body; the body wins.`,
+                { file, cardType: type.id },
+              ),
+            );
+          }
+          merged[type.bodyField] = row.body;
+        }
+      }
+
       const values: Record<string, CardValue> = {};
       const view: Record<string, CardValue> = {};
 
@@ -72,7 +97,7 @@ export async function resolveCards(project: Project, options: ResolveOptions = {
         view[name] = await toView(coerced, def, project, { checkAssets, assetCache, context, diagnostics });
       }
 
-      const id = deriveId(merged, type, values, index);
+      const id = deriveId(merged, type, values, index, row.id);
       const owner = idOwners.get(id);
       if (owner) {
         diagnostics.push(
@@ -111,15 +136,25 @@ function normaliseKeys(values: Record<string, unknown>): Record<string, unknown>
   return out;
 }
 
+/**
+ * Id precedence: an explicit `id`, then the source's own identity (a per-component
+ * file's basename), then the `idFrom` field, then the row number. A filename is a
+ * better id than a display name because renaming the card does not move it.
+ */
 function deriveId(
   merged: Record<string, unknown>,
   type: ResolvedCardType,
   values: Record<string, CardValue>,
   index: number,
+  sourceId: string | undefined,
 ): string {
   const explicit = merged['id'];
   if (typeof explicit === 'string' && explicit.trim() !== '') return explicit.trim();
   if (typeof explicit === 'number') return String(explicit);
+  if (sourceId !== undefined && sourceId.trim() !== '') {
+    const slug = slugify(sourceId);
+    if (slug) return `${type.id}-${slug}`;
+  }
   const label = values[type.idFrom];
   if (typeof label === 'string' && label.trim() !== '') {
     const slug = slugify(label);
@@ -276,6 +311,7 @@ async function toView(
     case 'richtext':
       return renderRichText(String(value), {
         resolveIcon: (name) => project.icons[name] ?? null,
+        paragraphs: def.paragraphs,
       });
     case 'image': {
       const relative = path.posix.join(def.base ?? '', String(value).replace(/^\/+/, ''));

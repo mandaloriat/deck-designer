@@ -3,6 +3,7 @@ import path from 'node:path';
 import YAML from 'yaml';
 import { z } from 'zod';
 import { projectSchema, type ProjectConfig } from '../schema/project.js';
+import { expandDataSource } from '../data/read.js';
 import { DeckError } from '../util/errors.js';
 import { isSubPath, projectRelative, resolveInProject } from '../util/paths.js';
 import { parseLength, type Unit } from '../util/units.js';
@@ -120,6 +121,12 @@ async function discoverIcons(
   return icons;
 }
 
+/** The obvious target for a Markdown body when a type has exactly one candidate. */
+function soleRichTextField(fields: Record<string, { type: string }>): string | undefined {
+  const candidates = Object.entries(fields).filter(([, def]) => def.type === 'richtext');
+  return candidates.length === 1 ? candidates[0]?.[0] : undefined;
+}
+
 export interface LoadOptions {
   /** Directory or config file. Defaults to the current working directory. */
   cwd?: string;
@@ -203,9 +210,16 @@ export async function loadProject(options: LoadOptions = {}): Promise<Project> {
     for (const rel of raw.styles) typeStylePaths.push(await loadStyle(rel));
     const stylePaths = [...globalStylePaths, ...typeStylePaths];
 
-    const dataPaths = (raw.data === undefined ? [] : Array.isArray(raw.data) ? raw.data : [raw.data]).map((rel) =>
-      resolveInProject(root, rel),
-    );
+    const sources = raw.data === undefined ? [] : Array.isArray(raw.data) ? raw.data : [raw.data];
+    const dataPaths: string[] = [];
+    for (const rel of sources) dataPaths.push(...(await expandDataSource(resolveInProject(root, rel))));
+
+    const bodyField = raw.body ?? soleRichTextField(raw.fields);
+    if (raw.body !== undefined && raw.fields[raw.body] === undefined) {
+      throw new DeckError(`Card type "${raw.id}" declares body: ${raw.body}, which is not a field.`, {
+        code: 'config/unknown-body-field',
+      });
+    }
 
     cardTypes.push({
       id: raw.id,
@@ -214,6 +228,7 @@ export async function loadProject(options: LoadOptions = {}): Promise<Project> {
       fields: raw.fields,
       defaults: raw.defaults,
       idFrom: raw.idFrom,
+      ...(bodyField ? { bodyField } : {}),
       templatePath: resolveInProject(root, raw.template),
       templateSource: await readText(root, raw.template, 'template'),
       ...(raw.back

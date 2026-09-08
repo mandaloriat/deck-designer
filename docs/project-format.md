@@ -47,7 +47,8 @@ cardTypes:           # one entry per component type
     template: templates/creature.liquid
     back: templates/back.liquid
     styles: [templates/creature.css]
-    data: data/creatures.csv        # or a list of files
+    data: data/creatures            # a file, a list of files, or a directory
+    body: rules                     # field a Markdown body fills
     card: { width: 70 }             # overrides the deck default
     defaults: { faction: order }    # merged into every row
     idFrom: name                    # field an id is derived from
@@ -78,7 +79,7 @@ Lengths accept a bare number in the project `units`, or an explicit suffix:
 | Type | Accepts | Notes |
 |---|---|---|
 | `text` | any scalar | HTML-escaped before rendering; `maxLength`, `pattern` |
-| `richtext` | any scalar | `**bold**`, `*italic*`, line breaks, `[[icon]]`, a small tag allowlist |
+| `richtext` | any scalar | `**bold**`, `*italic*`, line breaks, `[[icon]]`, a small tag allowlist; `paragraphs` |
 | `number` / `integer` | number or numeric string | `min`, `max` |
 | `boolean` | `true/false/yes/no/1/0/x` | |
 | `enum` | one of `values` | anything else is an error |
@@ -90,20 +91,86 @@ Shorthand: `cost: integer` is the same as `cost: { type: integer }`.
 
 Three names are reserved and must not be declared as fields:
 
-- `id` — an explicit id. Without it, one is derived from the field named by
-  `idFrom` (`creature-dawn-sentinel`) or, failing that, from the row number.
+- `id` — an explicit id. Without it, one comes from the source's own identity (a
+  Markdown file's basename), then from the field named by `idFrom`, then from the
+  row number.
 - `copies` — print-run multiplier. The component is still listed once;
   `deck print-plan` is what expands it.
 - `type` — the component type id.
 
-## Data files
+## Data sources
 
-CSV, TSV, JSON and YAML. Structured files hold an array of objects, or an object
-with a `cards` array. Column names are matched to field names after trimming;
-a column that matches no field produces a warning and is ignored.
+Component rows can come from CSV, TSV, JSON, YAML or Markdown, and one component
+type can draw from several at once. They all feed the same field schema, so the
+format is a workflow choice, not a modelling one.
 
-Small decks can skip the file entirely and inline rows under `cards:` in
+`data:` takes a file, a list of files, or a directory. A directory means every
+data file inside it, in filename order, which is what makes one file per
+component practical without a glob syntax.
+
+```yaml
+data: data/creatures          # a directory
+data: data/creatures.csv      # one file
+data: [data/base.csv, data/expansion.csv]
+```
+
+Small sets can skip the file entirely and inline rows under `cards:` in
 `deck.yaml`.
+
+### Which format
+
+| Shape of the component | Use |
+|---|---|
+| Prose-heavy, a few dozen to a few hundred | one Markdown file each |
+| Mostly numbers, balanced by comparison | CSV |
+| In between, or generated | YAML / JSON |
+
+The deciding question is what a change looks like in `git diff`. In a CSV every
+row is one line, so rewording one sentence marks the whole component as changed.
+With a file per component the same edit is a one-line diff, and two people
+editing different cards never conflict. Against that, a table is far easier to
+scan when you are balancing costs against each other, which a directory of files
+is not.
+
+### Markdown
+
+One component per file: YAML front matter for the typed fields, everything after
+it as the body.
+
+```markdown
+---
+name: Thicket Warden
+cost: 4
+faction: wild
+attack: 3
+health: 6
+flavour: Older than the road beside it.
+---
+**Rooted.** Cannot be moved.
+
+Heals [[health]] 1 at the start of your turn.
+```
+
+The body fills the field named by `body:` on the component type, or, if that is
+omitted, the type's only `richtext` field. Setting the same field in both places
+is a warning and the body wins. The body is rich text, not full Markdown: bold,
+italics, line breaks, `[[icon]]` tokens and the inline tag allowlist, nothing
+else. Give the field `paragraphs: true` to turn blank-line separated blocks into
+`<p>` instead of `<br>`.
+
+The **filename is the id**. `dawn-sentinel.md` becomes `creature-dawn-sentinel`,
+and it stays that id when the `name` in the front matter changes, which is the
+main reason to prefer a file per component once artwork and manifests start
+referring to ids.
+
+### CSV, TSV, JSON, YAML
+
+CSV and TSV keep their header names verbatim, matched to field names after
+trimming. JSON and YAML hold an array of objects, or an object with a `cards`
+array.
+
+A column or key that matches no declared field produces a warning and is
+ignored, which is how a typo gets caught instead of silently doing nothing.
 
 ## Templates
 

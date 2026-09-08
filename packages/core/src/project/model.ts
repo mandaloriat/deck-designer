@@ -30,6 +30,8 @@ export interface ResolvedCardType {
   defaults: Record<string, unknown>;
   /** Field an id is derived from when a row has no explicit `id`. */
   idFrom: string;
+  /** Field a Markdown body fills; resolved at load time. */
+  bodyField?: string;
   templatePath: string;
   templateSource: string;
   backPath?: string;

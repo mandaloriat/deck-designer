@@ -36,6 +36,8 @@ const richTextField = z.object({
   type: z.literal('richtext'),
   default: z.string().optional(),
   maxLength: z.number().int().positive().optional(),
+  /** Wrap blank-line separated blocks in <p> instead of joining with <br>. */
+  paragraphs: z.boolean().default(false),
 });
 
 const numberField = z.object({

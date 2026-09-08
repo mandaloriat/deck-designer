@@ -68,8 +68,9 @@ every component would overwrite the previous one.
 ## deck init [dir]
 
 Scaffolds a working project: config, a card type and a token type, templates,
-CSS, data and icons. `--name` sets the project name, `--force` overwrites
-existing files.
+CSS, data and icons. The cards come as one Markdown file each and the tokens as a
+CSV, which is the choice [docs/project-format.md](project-format.md#which-format)
+argues for. `--name` sets the project name, `--force` overwrites existing files.
 
 ## deck validate
 

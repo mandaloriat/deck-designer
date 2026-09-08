@@ -2,8 +2,9 @@
 
 Render game components from data and HTML/CSS templates, from the command line.
 
-Content lives in CSV or YAML, layout lives in templates, and both are plain files
-under version control. One command turns them into PNGs at an exact resolution.
+Content lives in whichever plain-text format suits it — a Markdown file per card,
+a CSV of tokens, YAML, JSON — layout lives in templates, and all of it is under
+version control. One command turns them into PNGs at an exact resolution.
 
 Cards are the obvious case, but a component type is only a size, a template and
 some rows, so tokens, tiles, player boards and reference sheets work the same way
@@ -32,6 +33,12 @@ and a renderer whose output does not move when nothing changed.
 `enum`, `image`, `color`, `list`). `deck validate` catches a misspelled column, a
 value outside an enum, a missing image, an over-long name and a broken template
 before a browser starts.
+
+**One schema, several formats.** The same field definitions read CSV, TSV, JSON,
+YAML and Markdown with YAML front matter, and one project can mix them. Prose-heavy
+cards want a file each, so a wording change is a one-line diff; a sheet of tokens
+wants a table, because balancing is comparison. That choice is yours per component
+type, not the tool's.
 
 **Exact output.** A 63x88mm card at 300dpi comes out 744x1039 pixels, not
 747x1041. Chromium clips screenshots on whole CSS pixels, so components are zoomed

@@ -29,14 +29,17 @@ cardTypes:
     back: templates/back.liquid
     styles:
       - templates/creature.css
-    data: data/creatures.csv
+    # A directory means every data file in it. These are one Markdown file per
+    # card: front matter for the fields, the body for the rules text.
+    data: data/creatures
+    body: rules
     fields:
       name: { type: text, required: true, maxLength: 28 }
       cost: { type: integer, min: 0, max: 20, default: 0 }
       faction: { type: enum, values: [order, chaos, wild], default: order }
       attack: { type: integer, min: 0, default: 0 }
       health: { type: integer, min: 0, default: 1 }
-      rules: { type: richtext }
+      rules: { type: richtext, paragraphs: true }
       flavour: { type: text }
       art: { type: image }
 
@@ -46,6 +49,7 @@ cardTypes:
     template: templates/token.liquid
     styles:
       - templates/token.css
+    # Mostly numbers, so a table stays easier to balance than a file each.
     data: data/tokens.csv
     idFrom: label
     card:
@@ -155,6 +159,8 @@ cardTypes:
   font-size: 3mm;
   line-height: 1.25;
 }
+.rules p { margin: 0 0 1.2mm; }
+.rules p:last-of-type { margin-bottom: 0; }
 .rules .flavour {
   display: block;
   margin-top: 1mm;
@@ -235,12 +241,50 @@ cardTypes:
 </style>
 `,
 
-  'data/creatures.csv': `name,cost,faction,attack,health,rules,flavour
-Dawn Sentinel,2,order,2,3,"**Guard.** While this is on the field, adjacent allies take 1 less damage.",They stand so others need not.
-Ember Whelp,1,chaos,2,1,"When this enters play, deal [[attack]] 1 damage to any target.",
-Thicket Warden,4,wild,3,6,"**Rooted.** Cannot be moved. Heals [[health]] 1 at the start of your turn.",Older than the road beside it.
-Tidecaller,3,order,1,4,"Draw a card when an ally leaves play.",
+  'data/creatures/dawn-sentinel.md': `---
+name: Dawn Sentinel
+cost: 2
+faction: order
+attack: 2
+health: 3
+flavour: They stand so others need not.
+---
+**Guard.** While this is on the field, adjacent allies take 1 less damage.
 `,
+
+  'data/creatures/ember-whelp.md': `---
+name: Ember Whelp
+cost: 1
+faction: chaos
+attack: 2
+health: 1
+---
+When this enters play, deal [[attack]] 1 damage to any target.
+`,
+
+  'data/creatures/thicket-warden.md': `---
+name: Thicket Warden
+cost: 4
+faction: wild
+attack: 3
+health: 6
+flavour: Older than the road beside it.
+---
+**Rooted.** Cannot be moved.
+
+Heals [[health]] 1 at the start of your turn.
+`,
+
+  'data/creatures/tidecaller.md': `---
+name: Tidecaller
+cost: 3
+faction: order
+attack: 1
+health: 4
+---
+Draw a card when an ally leaves play.
+`,
+
 
   'assets/icons/attack.svg': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M4 3l7.5 7.5-2 2L2 5V3h2zm14.5 0H21v2.5L9.7 16.8l2.1 2.1-1.4 1.4-1.4-1.4-1.8 1.8-1.4-1.4 1.8-1.8-1.4-1.4 1.4-1.4 2.1 2.1L18.5 3z"/></svg>`,
 
@@ -306,7 +350,9 @@ is just a size, a template and some rows.
     deck export --type token --dpi 600 --out /tmp/tokens
     deck print-plan      # sheet layout handed to print-cards
 
-Data lives in \`data/\`, layout in \`templates/\`, artwork in \`assets/\`.
+Cards are one Markdown file each in \`data/creatures/\`: front matter for the
+fields, the body for the rules text. Tokens are a CSV, because they are mostly
+numbers and a table is easier to balance. Both feed the same field schema.
 Everything is plain text, so \`git diff\` shows exactly what changed.
 `,
 };

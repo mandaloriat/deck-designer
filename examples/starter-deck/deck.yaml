@@ -27,14 +27,17 @@ cardTypes:
     back: templates/back.liquid
     styles:
       - templates/creature.css
-    data: data/creatures.csv
+    # A directory means every data file in it. These are one Markdown file per
+    # card: front matter for the fields, the body for the rules text.
+    data: data/creatures
+    body: rules
     fields:
       name: { type: text, required: true, maxLength: 28 }
       cost: { type: integer, min: 0, max: 20, default: 0 }
       faction: { type: enum, values: [order, chaos, wild], default: order }
       attack: { type: integer, min: 0, default: 0 }
       health: { type: integer, min: 0, default: 1 }
-      rules: { type: richtext }
+      rules: { type: richtext, paragraphs: true }
       flavour: { type: text }
       art: { type: image }
 
@@ -44,6 +47,7 @@ cardTypes:
     template: templates/token.liquid
     styles:
       - templates/token.css
+    # Mostly numbers, so a table stays easier to balance than a file each.
     data: data/tokens.csv
     idFrom: label
     card:
