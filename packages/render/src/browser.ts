@@ -57,7 +57,8 @@ export class ChromiumNotFoundError extends Error {
   constructor(searched: string[]) {
     super(
       'Could not find a Chromium binary.\n' +
-        'Set DECK_CHROMIUM_PATH to a Chromium/Chrome executable, or install one with `npx playwright install chromium`.\n' +
+        'Set DECK_CHROMIUM_PATH to a Chromium/Chrome executable, or install one with ' +
+        '`pnpm exec playwright install chromium` (npx outside a pnpm project).\n' +
         `Searched: ${searched.join(', ') || '(nothing)'}`,
     );
     this.name = 'ChromiumNotFoundError';
