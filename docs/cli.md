@@ -208,6 +208,18 @@ The diagnostics drawer shows what `deck validate` would report, live. A broken
 `deck.yaml` shows the parser error with its line and column instead of a blank
 page.
 
+**Export PNG** writes the current selection into the project, exactly as
+`deck export` would: same renderer, same naming, same output directory
+(`dist/cards`). What carries over from the toolbar is what describes the
+artefact — the type and id filters, the chosen faces, bleed and rounded
+corners. Zoom does not, because it is screen resolution and the export uses the
+project's dpi. Guides do not either, at all: they are an inspection overlay, and
+a crop mark baked into a print file is found at the printer's. The button says
+what it is about to write before you press it, and what it wrote afterwards.
+
+Unlike the rest of the preview, this needs Chromium. When none is found the
+button is disabled and carries the reason; `deck doctor` says how to fix it.
+
 The theme panel edits the custom properties the project lists under `theme:`.
 Dragging a slider or a colour picker updates the frame live; releasing it writes
 the value into the stylesheet that declares it, and the watcher reloads from

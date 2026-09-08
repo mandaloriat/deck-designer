@@ -59,6 +59,8 @@ export const CHROME_PAGE = `<!doctype html>
   }
   button { cursor: pointer; }
   button:hover { border-color: #3d434e; }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button:disabled:hover { border-color: var(--line); }
   button.on { background: var(--accent); border-color: var(--accent); color: #0f1115; }
   input[type=search] { min-width: 160px; }
   input:disabled { opacity: 0.5; }
@@ -122,6 +124,7 @@ export const CHROME_PAGE = `<!doctype html>
   .pill { padding: 1px 7px; border-radius: 999px; background: var(--bar-2); border: 1px solid var(--line); }
   .pill.error { color: var(--error); border-color: #4a2b33; }
   .pill.warn { color: var(--warn); border-color: #4a3f28; }
+  #export-status.bad { color: var(--error); }
 </style>
 </head>
 <body>
@@ -155,6 +158,7 @@ export const CHROME_PAGE = `<!doctype html>
   <input type="search" id="search" placeholder="Filter by id" />
 
   <div class="spacer"></div>
+  <button id="export" disabled>Export PNG</button>
   <button id="toggle-theme" hidden>Theme</button>
   <button id="toggle-diagnostics">Diagnostics</button>
 </header>
@@ -171,6 +175,7 @@ export const CHROME_PAGE = `<!doctype html>
   <span id="status">connecting</span>
   <span id="counts"></span>
   <span id="badges"></span>
+  <span id="export-status"></span>
   <div class="spacer"></div>
   <span id="updated"></span>
 </footer>
@@ -426,6 +431,78 @@ export const CHROME_PAGE = `<!doctype html>
     variables.forEach(function (v) { box.appendChild(knob(v, writable)); });
   }
 
+
+  /**
+   * Writes the current selection to PNG, into the project, exactly as
+   * "deck export" would. Zoom is screen resolution and guides are an
+   * inspection overlay, so neither is sent: a crop mark baked into a print
+   * file is the kind of mistake you find at the printer's. Bleed and rounded
+   * corners are decisions about the artefact, so those do carry, and the
+   * button says so before you press it.
+   */
+  var exportable = { ok: false, reason: 'checking' };
+  var exportShown = 0;
+
+  function describeExport() {
+    var parts = [exportShown + ' component' + (exportShown === 1 ? '' : 's')];
+    parts.push(state.faces.replace(',', '+'));
+    if (state.bleed) parts.push('with bleed');
+    if (state.rounded) parts.push('rounded corners');
+    return parts.join(', ') + ' → the project output directory';
+  }
+
+  function refreshExportButton() {
+    var button = el('export');
+    var ready = exportable.ok && exportShown > 0 && !button.dataset.busy;
+    button.disabled = !ready;
+    button.textContent = button.dataset.busy ? 'Exporting…' : 'Export PNG';
+    button.title = exportable.ok
+      ? (exportShown === 0 ? 'Nothing matches the current filter' : describeExport())
+      : exportable.reason;
+  }
+
+  function setExportStatus(text, bad) {
+    var status = el('export-status');
+    status.textContent = text;
+    status.classList.toggle('bad', !!bad);
+  }
+
+  el('export').onclick = function () {
+    var button = el('export');
+    button.dataset.busy = '1';
+    refreshExportButton();
+    setExportStatus('rendering ' + describeExport().split(' → ')[0] + '…', false);
+    fetch('/__preview/export', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        type: state.type,
+        search: state.search,
+        faces: state.faces,
+        bleed: state.bleed,
+        rounded: state.rounded,
+      })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, data: d }; });
+    }).then(function (out) {
+      if (!out.ok) {
+        setExportStatus(out.data && out.data.error ? out.data.error.message : 'The export failed.', true);
+        return;
+      }
+      var warnings = (out.data.diagnostics || []).length;
+      setExportStatus(
+        'wrote ' + out.data.files + ' file(s) to ' + out.data.out + ' at ' + out.data.dpi + 'dpi' +
+        (warnings ? ' (' + warnings + ' warning(s), see diagnostics)' : ''),
+        false
+      );
+    }).catch(function () {
+      setExportStatus('The preview server did not answer.', true);
+    }).then(function () {
+      delete button.dataset.busy;
+      refreshExportButton();
+    });
+  };
+
   function loadState() {
     fetch(stateUrl()).then(function (r) { return r.json(); }).then(function (data) {
       el('project').textContent = data.error ? '' : ' \\u00b7 ' + data.project;
@@ -445,6 +522,9 @@ export const CHROME_PAGE = `<!doctype html>
       el('badges').innerHTML =
         (errors ? '<span class="pill error">' + errors + ' error</span> ' : '') +
         (warnings ? '<span class="pill warn">' + warnings + ' warning</span>' : '');
+      exportable = data.exportable || { ok: false, reason: 'The project did not load.' };
+      exportShown = data.error ? 0 : data.shown;
+      refreshExportButton();
       renderTheme(data.theme || [], data.themeWritable !== false);
       renderDiagnostics(data.error ? [{ severity: 'error', code: data.error.code, message: data.error.message }] : (data.diagnostics || []));
       if (errors || data.error) el('diagnostics').hidden = false;
