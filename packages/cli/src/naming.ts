@@ -48,11 +48,3 @@ export function formatName(pattern: string, context: NameContext): string {
   if (cleaned.length === 0) throw new Error(`Name pattern "${pattern}" produced an empty path.`);
   return cleaned.join('/');
 }
-
-export function validateNamePattern(pattern: string): void {
-  if (!/\{(id|name|index)\}/.test(pattern)) {
-    throw new Error(
-      `Name pattern "${pattern}" has no {id}, {name} or {index}, so every component would overwrite the previous one.`,
-    );
-  }
-}
