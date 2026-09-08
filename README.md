@@ -64,12 +64,22 @@ from a project that failed validation (2).
     deck build             render everything, write a manifest
     deck export            render a selection to PNG
     deck preview           live view in a browser, reloading on save
+    deck atlas             one grid image, for a virtual tabletop
     deck print-plan        lay the PNGs onto sheets for printing
     deck watch             rebuild on change
     deck doctor            check the toolchain
 
 See [docs/cli.md](docs/cli.md) for the full surface and
 [docs/project-format.md](docs/project-format.md) for `deck.yaml`.
+
+## Virtual tabletops
+
+`deck atlas` writes what a tabletop imports: every face in one grid image, a
+back, and a manifest saying which component is in which cell. The grid is
+capped at 10x7 and the image at 4096px by default, which is what Tabletop
+Simulator accepts.
+
+    deck atlas -p examples/briscola
 
 ## Printing
 

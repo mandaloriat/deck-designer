@@ -107,6 +107,36 @@ Examples:
     deck export --id creature-ember-whelp --guides --out /tmp/proof
     deck export --where faction=chaos --name '{index}-{name}.png' --out /tmp/chaos
 
+## deck atlas
+
+Renders the deck as one grid image, which is how a virtual tabletop imports a
+deck: all the faces in a grid, a separate back, and the grid dimensions.
+
+    -o, --out <dir>     output directory (default: <output.dir>/atlas)
+    --columns <n>       force the grid width (max 10)
+    --rows <n>          force the grid height (max 7)
+    --max-size <px>     cap the longest side of the image (default 4096)
+    --dpi <number>      cap the resolution
+
+    deck atlas -p examples/briscola
+
+The grid is chosen before the resolution, which keeps a small deck sharp: nine
+cards become a 3x3 grid at full size rather than a ten-wide strip at a third of
+it. The resolution is then whichever fits the image under the cap, never finer
+than the deck prints at.
+
+Tabletop Simulator accepts at most a 10x7 grid, so a deck over seventy faces is
+split into several atlases. Each set is written with an `atlas.json` recording
+the grid, the pixel sizes, and which component sits in which cell, so mapping a
+cell back to an id is not guesswork.
+
+When every card shares a back, one back image is written at exactly the cell
+size. When backs differ per card, a second grid is written in the same order and
+`uniqueBacks` says so.
+
+An atlas holds one card size, so select a single component type when a project
+mixes them.
+
 ## deck print-plan
 
 Lays the rendered PNGs onto sheets and writes a script that calls

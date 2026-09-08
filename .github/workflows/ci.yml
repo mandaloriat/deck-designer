@@ -28,3 +28,4 @@ jobs:
           node packages/cli/dist/bin.js print-plan --project examples/starter-deck --json
           node packages/cli/dist/bin.js build --project examples/briscola --quiet
           node packages/cli/dist/bin.js print-plan --project examples/briscola --page A4 --margin 6 --json
+          node packages/cli/dist/bin.js atlas --project examples/briscola --json

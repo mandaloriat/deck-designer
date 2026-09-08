@@ -17,8 +17,8 @@ Out of scope. This tool turns structured data into rendered components.
 
 - The renderer stays headless, which is what makes it work in CI and under an
   agent.
-- Playtesting happens where it already works: exported PNGs loaded into a virtual
-  tabletop, or printed proofs. `--rounded` exists for the first case and
-  `deck print-plan` for the second.
+- Playtesting happens where it already works: a virtual tabletop, or printed
+  proofs. `deck atlas` feeds the first and `deck print-plan` the second, and
+  both are handoffs rather than features that grow.
 - If a simulator is ever wanted, it belongs in a separate package consuming
   `manifest.json`, with its own release cycle. Nothing here blocks that.

@@ -8,6 +8,7 @@ export * from './template/engine.js';
 export * from './template/document.js';
 export * from './template/compose.js';
 export * from './layout/grid.js';
+export * from './layout/atlas.js';
 export * from './layout/gallery.js';
 export * from './util/units.js';
 export * from './util/paths.js';
