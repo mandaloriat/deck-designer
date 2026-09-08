@@ -62,6 +62,19 @@ export function resolveTheme(project: Project): ResolvedTheme {
       );
     }
 
+    // `theme:` is deck-wide, so a knob living in one type's stylesheet reaches
+    // only that type: the control would appear to do nothing for the others.
+    // Worth saying, because the panel is not the place to discover it.
+    const missing = project.cardTypes.filter((type) => !type.stylePaths.includes(winner)).map((type) => type.id);
+    if (missing.length > 0) {
+      diagnostics.push(
+        diag('warning', 'theme/partial', `theme: ${entry.name} is declared in ${file}, which does not apply to ${missing.join(', ')}.`, {
+          file,
+          hint: 'Move it to a stylesheet under the top-level `styles:` so every component type sees it.',
+        }),
+      );
+    }
+
     const value = readVariable(css, entry.name) as string;
     const { kind, unit } = classify(value);
     // A slider needs both ends. One alone would silently become a range of

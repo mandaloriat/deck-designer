@@ -48,6 +48,18 @@ describe('readVariable', () => {
     expect(readVariable(CSS, '--missing')).toBeUndefined();
   });
 
+  it('ignores a commented-out declaration', () => {
+    // A theme stylesheet is where commented-out alternatives live, so this is
+    // the normal case, not a contrived one.
+    expect(readVariable(':root {\n  /* --ink: red; */\n  --ink: #111;\n}', '--ink')).toBe('#111');
+    expect(readVariable(':root {\n/*\n  --ink: red;\n*/\n  --ink: #111;\n}', '--ink')).toBe('#111');
+    expect(readVariable('/* --ink: red; */', '--ink')).toBeUndefined();
+  });
+
+  it('does not treat a quoted comment opener as a comment', () => {
+    expect(readVariable('--label: "/*"; --ink: #111;', '--ink')).toBe('#111');
+  });
+
   it('does not match a longer property that ends with the same name', () => {
     expect(readVariable('--card-ink: red;', '--ink')).toBeUndefined();
   });
@@ -61,6 +73,8 @@ describe('countDeclarations', () => {
   it('counts every declaration, so a shadowed knob can be reported', () => {
     expect(countDeclarations(CSS, '--ink')).toBe(1);
     expect(countDeclarations(`${CSS}\n.dark { --ink: #fff; }`, '--ink')).toBe(2);
+    // Otherwise a commented-out alternative reads as a shadowed declaration.
+    expect(countDeclarations(`${CSS}\n/* .dark { --ink: #fff; } */`, '--ink')).toBe(1);
   });
 });
 
@@ -83,6 +97,11 @@ describe('writeVariable', () => {
     ] as const) {
       expect(readVariable(writeVariable(CSS, name, value), name)).toBe(value);
     }
+  });
+
+  it('writes the live declaration, not a commented-out one above it', () => {
+    const css = ':root {\n  /* --ink: red; */\n  --ink: #111;\n}';
+    expect(writeVariable(css, '--ink', '#fff')).toBe(':root {\n  /* --ink: red; */\n  --ink: #fff;\n}');
   });
 
   it('refuses values that would escape the declaration', () => {
@@ -119,6 +138,40 @@ describe('resolveTheme', () => {
       // A knob nothing declares is a typo in the config, not an empty control.
       expect(diagnostics).toHaveLength(1);
       expect(diagnostics[0]).toMatchObject({ code: 'theme/not-declared', severity: 'warning' });
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
+  it('says when a knob reaches only some component types', async () => {
+    const fixture = await makeProject({
+      'deck.yaml': `version: 1
+name: Two
+units: mm
+card: { width: 63, height: 88 }
+theme: [--ink]
+cardTypes:
+  - id: alpha
+    template: templates/t.liquid
+    styles: [a.css]
+    cards: [{ name: A }]
+    fields: { name: { type: text } }
+  - id: beta
+    template: templates/t.liquid
+    styles: [b.css]
+    cards: [{ name: B }]
+    fields: { name: { type: text } }
+`,
+      'a.css': ':root { --ink: red; }',
+      'b.css': ':root { --other: blue; }',
+      'templates/t.liquid': '<p>{{ card.name }}</p>',
+    });
+    try {
+      const { variables, diagnostics } = resolveTheme(await loadProject({ cwd: fixture.root }));
+      expect(variables[0]).toMatchObject({ value: 'red', file: 'a.css' });
+      expect(diagnostics).toHaveLength(1);
+      expect(diagnostics[0]).toMatchObject({ code: 'theme/partial', severity: 'warning' });
+      expect(diagnostics[0]?.message).toContain('beta');
     } finally {
       await fixture.cleanup();
     }

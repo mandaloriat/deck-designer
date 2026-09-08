@@ -241,7 +241,13 @@ value round-trip safely, where rewriting rendered markup would not.
 A name nothing declares is reported as `theme/not-declared` rather than shown as
 an empty control, and a name declared in several stylesheets is reported as
 `theme/shadowed` with the file the cascade actually uses, which is the one the
-panel edits.
+panel edits. Because `theme:` is deck-wide, a knob whose declaration sits in one
+component type's stylesheet reaches only that type; that is `theme/partial`, and
+it names the types the control will appear to do nothing for.
+
+Commented-out declarations are not knobs. A theme stylesheet is where alternatives
+get parked, so `/* --ink: red; */` is skipped for reading, counting and writing
+alike, and the live declaration below it is the one the panel edits.
 
 Editing is offered only when the preview is bound to loopback. On any other
 interface the panel is read-only, because a write endpoint reachable from the
