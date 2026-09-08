@@ -43,38 +43,9 @@ export const cardTypeSchema = z.object({
   fields: z.record(fieldDefSchema).default({}),
   /** Values merged into every row of this type before field defaults apply. */
   defaults: z.record(z.unknown()).default({}),
+  /** Field an id is derived from when a row has no explicit `id`. */
+  idFrom: z.string().default('name'),
 });
-
-const pageSchema = z.union([
-  z.string(),
-  z.object({ width: lengthSchema, height: lengthSchema }),
-]);
-
-const singleProfileSchema = z.object({
-  kind: z.literal('single'),
-  /** Include the bleed area in the exported page. */
-  bleed: z.boolean().default(true),
-  marks: z.boolean().default(false),
-  /** How backs are ordered in the document. */
-  backs: z.enum(['none', 'interleave', 'append']).default('interleave'),
-});
-
-const sheetProfileSchema = z.object({
-  kind: z.literal('sheet'),
-  page: pageSchema.default('A4'),
-  orientation: z.enum(['portrait', 'landscape']).default('portrait'),
-  margin: lengthSchema.default(8),
-  gutter: lengthSchema.default(0),
-  /** Fixed grid; when omitted the largest fitting grid is computed. */
-  columns: z.number().int().positive().optional(),
-  rows: z.number().int().positive().optional(),
-  bleed: z.boolean().default(false),
-  marks: z.boolean().default(true),
-  /** `none` skips backs, the flip modes mirror the grid for duplex printing. */
-  duplex: z.enum(['none', 'long-edge', 'short-edge']).default('long-edge'),
-});
-
-export const profileSchema = z.discriminatedUnion('kind', [singleProfileSchema, sheetProfileSchema]);
 
 export const renderSchema = z.object({
   dpi: z.number().positive().max(2400).default(300),
@@ -104,13 +75,9 @@ export const projectSchema = z.object({
     })
     .default({}),
   output: z.object({ dir: z.string().default('dist') }).default({}),
-  profiles: z.record(profileSchema).default({}),
   cardTypes: z.array(cardTypeSchema).min(1),
 });
 
 export type ProjectConfig = z.infer<typeof projectSchema>;
 export type CardTypeConfig = z.infer<typeof cardTypeSchema>;
-export type ProfileConfig = z.infer<typeof profileSchema>;
-export type SheetProfileConfig = z.infer<typeof sheetProfileSchema>;
-export type SingleProfileConfig = z.infer<typeof singleProfileSchema>;
 export type FontConfig = z.infer<typeof fontSchema>;

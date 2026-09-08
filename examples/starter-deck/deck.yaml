@@ -20,30 +20,6 @@ styles:
 icons:
   dir: assets/icons
 
-profiles:
-  # Home printing: cards tiled edge to edge, cut on the crop marks.
-  print:
-    kind: sheet
-    page: A4
-    margin: 10
-    gutter: 0
-    bleed: false
-    marks: true
-    duplex: long-edge
-  # Professional printing:each card cut individually, so bleeds need room.
-  print-bleed:
-    kind: sheet
-    page: A4
-    margin: 10
-    gutter: 6
-    bleed: true
-    marks: true
-    duplex: long-edge
-  proofs:
-    kind: single
-    bleed: false
-    backs: interleave
-
 cardTypes:
   - id: creature
     name: Creature
@@ -61,3 +37,22 @@ cardTypes:
       rules: { type: richtext }
       flavour: { type: text }
       art: { type: image }
+
+  # Components are not only cards: a type is just a size, a template and rows.
+  - id: token
+    name: Token
+    template: templates/token.liquid
+    styles:
+      - templates/token.css
+    data: data/tokens.csv
+    idFrom: label
+    card:
+      width: 25
+      height: 25
+      bleed: 2
+      cornerRadius: 12.5
+    fields:
+      label: { type: text, required: true, maxLength: 12 }
+      value: { type: integer, default: 1 }
+      icon: { type: enum, values: [attack, health, energy], default: energy }
+      tint: { type: color, default: '#2f5f8f' }

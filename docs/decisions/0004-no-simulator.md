@@ -4,21 +4,21 @@ Status: accepted
 
 ## Context
 
-Cider ships a playtest simulator. It is the feature that most enlarges the
-surface area: it needs a rules model, a game state model, a UI, multiplayer or
-hot-seat handling, and it drags the whole project toward being an application
-rather than a build tool.
+Playtesting is the feature most likely to be asked for next, and the one that
+most enlarges the surface area: it needs a rules model, a game state model, a UI,
+and multiplayer or hot-seat handling. It would drag the project toward being an
+application rather than a build tool.
 
 ## Decision
 
-Out of scope. This tool turns card data into card images and print files.
+Out of scope. This tool turns structured data into rendered components.
 
 ## Consequences
 
 - The renderer stays headless, which is what makes it work in CI and under an
   agent.
-- Playtesting happens where it already works: exported images loaded into a
-  virtual tabletop, or printed proofs. `--rounded` exists for the first case and
-  the sheet profile for the second.
+- Playtesting happens where it already works: exported PNGs loaded into a virtual
+  tabletop, or printed proofs. `--rounded` exists for the first case and
+  `deck print-plan` for the second.
 - If a simulator is ever wanted, it belongs in a separate package consuming
   `manifest.json`, with its own release cycle. Nothing here blocks that.

@@ -22,5 +22,7 @@ jobs:
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test
-      - name: Build the example deck
-        run: node packages/cli/dist/bin.js build --project examples/starter-deck --json
+      - name: Build the example project
+        run: |
+          node packages/cli/dist/bin.js build --project examples/starter-deck --json
+          node packages/cli/dist/bin.js print-plan --project examples/starter-deck --json

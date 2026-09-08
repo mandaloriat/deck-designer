@@ -4,9 +4,10 @@ Status: accepted
 
 ## Context
 
-Templates come from the deck, and decks get cloned from repositories. A template
-language that can evaluate JavaScript means building someone else's deck runs
-their code. The candidates were Handlebars, Nunjucks, Eta and Liquid.
+Templates come from the project, and projects get cloned from repositories. A
+template language that can evaluate JavaScript means building someone else's
+project runs their code. The candidates were Handlebars, Nunjucks, Eta and
+Liquid.
 
 ## Decision
 

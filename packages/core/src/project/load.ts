@@ -213,6 +213,7 @@ export async function loadProject(options: LoadOptions = {}): Promise<Project> {
       geometry: geometryFrom(units, geometry, raw.card),
       fields: raw.fields,
       defaults: raw.defaults,
+      idFrom: raw.idFrom,
       templatePath: resolveInProject(root, raw.template),
       templateSource: await readText(root, raw.template, 'template'),
       ...(raw.back
@@ -237,7 +238,6 @@ export async function loadProject(options: LoadOptions = {}): Promise<Project> {
     render: config.render,
     fonts,
     outputDir: path.resolve(root, config.output.dir),
-    profiles: config.profiles,
     icons,
     styleSources,
     cardTypes,

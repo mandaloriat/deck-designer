@@ -1,0 +1,28 @@
+.token {
+  position: absolute;
+  inset: calc(-1 * var(--dd-bleed));
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.4mm;
+  background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--tint) 70%, #fff), var(--tint));
+  color: #fff;
+  text-align: center;
+}
+.token .glyph {
+  height: 5mm;
+  filter: brightness(0) invert(1);
+  opacity: 0.9;
+}
+.token .value {
+  font-size: 5mm;
+  font-weight: 700;
+  line-height: 1;
+}
+.token .label {
+  max-width: 18mm;
+  font-size: 2.2mm;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.85;
+}

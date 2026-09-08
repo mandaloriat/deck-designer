@@ -7,6 +7,6 @@ You may obtain a copy of the License at
 
     http://www.apache.org/licenses/LICENSE-2.0
 
-This project is an independent, clean-room implementation. It does not
-incorporate source code, templates, stylesheets or assets from any other
-card-design tool, and it is not derived from any AGPL-licensed codebase.
+This project is an independent implementation, written from the problem it
+solves. It incorporates no source code, templates, stylesheets or assets from
+any other project, and its dependencies are permissively licensed.

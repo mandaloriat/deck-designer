@@ -6,7 +6,7 @@ Every command accepts the global flags:
     -q, --quiet     no progress output
     --no-color      no ANSI escapes
 
-Exit codes: `0` success, `1` the command failed, `2` the deck has validation
+Exit codes: `0` success, `1` the command failed, `2` the project has validation
 errors, `3` bad usage.
 
 With `--json`, stdout carries only the result envelope; progress and diagnostics
@@ -16,7 +16,7 @@ go to stderr, so `deck cards --json | jq` works unchanged.
 {
   "ok": true,
   "command": "validate",
-  "data": { "cards": 4, "cardTypes": [] },
+  "data": { "cards": 7, "cardTypes": [] },
   "diagnostics": [
     {
       "severity": "warning",
@@ -31,22 +31,45 @@ go to stderr, so `deck cards --json | jq` works unchanged.
 ```
 
 Diagnostic codes are stable and namespaced: `config/*`, `data/*`, `asset/*`,
-`template/*`, `layout/*`, `render/*`, `select/*`, `doctor/*`.
+`template/*`, `layout/*`, `render/*`, `print/*`, `select/*`, `doctor/*`.
 
-## Selecting cards
+## Selecting components
 
-Commands that read a deck share these:
+Commands that read a project share these:
 
     -p, --project <path>       project directory or deck.yaml (default: cwd, then parents)
-    -t, --type <id...>         restrict to card types
-    -i, --id <cardId...>       restrict to card ids
+    -t, --type <id...>         restrict to component types
+    -i, --id <componentId...>  restrict to ids
     -w, --where <field=value>  restrict to rows whose field equals a value
     -n, --limit <count>        take at most this many
 
+## Rendering options
+
+`build`, `export` and `watch` share these:
+
+    -o, --out <dir>        output directory
+    --dpi <number>         output resolution
+    --face <face...>       front, back, or both
+    --name <pattern>       filename pattern (default: {type}/{id}.{face}.png)
+    --bleed                include the bleed area
+    --rounded              round the corners
+    --concurrency <n>      parallel render pages
+    --allow-network        let the page make outbound requests
+
+`--allow-network` is off by default: a build that silently depends on a CDN is a
+build that renders differently next month.
+
+Name pattern tokens: `{id}`, `{type}`, `{face}`, `{name}` (the slugified `idFrom`
+field, falling back to the id) and `{index}`, which is 1-based within a component
+type and zero-padded to a fixed width so a directory listing sorts in project
+order. A pattern with none of `{id}`, `{name}` or `{index}` is rejected, since
+every component would overwrite the previous one.
+
 ## deck init [dir]
 
-Scaffolds a working project: config, two templates, CSS, a CSV, three icons.
-`--name` sets the deck name, `--force` overwrites existing files.
+Scaffolds a working project: config, a card type and a token type, templates,
+CSS, data and icons. `--name` sets the project name, `--force` overwrites
+existing files.
 
 ## deck validate
 
@@ -59,62 +82,72 @@ to run on every save.
 
 ## deck cards
 
-Lists the deck. `--fields name cost` picks the columns; `--json` returns each
-card's resolved values and its source file and row.
+Lists the components. `--fields name cost` picks the columns; `--json` returns
+each one's resolved values and its source file and row.
 
 ## deck build
 
-The one command CI needs. Renders card images, every profile declared in
-`deck.yaml`, and `manifest.json`.
+The one command CI needs. Renders every selected component and writes
+`manifest.json` next to the images.
 
-    -o, --out <dir>        output directory
-    --dpi <number>         raster resolution
-    --face <face...>       front, back, or both
-    --no-images            skip PNGs
-    --no-profiles          skip PDFs
-    --clean                remove the output directory first
-    --concurrency <n>      parallel render pages
-    --allow-network        let the page make outbound requests
+    --clean    remove the output directory first
 
-`--allow-network` is off by default: a build that silently depends on a CDN is a
-build that renders differently next month.
+## deck export
 
-## deck export png|pdf|sheet
+A selection, rendered with ad-hoc flags, to wherever you want it. Same renderer
+as `build`, without the manifest.
 
-One output, configured by flags rather than by the config file.
-
-    -o, --out <path>       file (pdf, sheet) or directory (png)
-    --dpi <number>
-    --face <face...>
-    --bleed / --no-bleed
-    --rounded              round the corners — for virtual tabletops, not for print
-    --guides               draw bleed and safe-area guides
-    --copies               repeat each card by its copies count
-
-Sheet layout:
-
-    --page <size>          A4, LETTER, A3, or 210x297 / 8.5inx11in
-    --orientation <mode>   portrait | landscape
-    --margin <length>      default 8
-    --gutter <length>      default 0
-    --columns <n>          force a grid instead of fitting the largest one
-    --rows <n>
-    --duplex <mode>        none | long-edge | short-edge
-    --no-marks             omit crop marks
-
-Backs are emitted as their own page directly after the matching front, mirrored
-on the flip axis, so a duplex printer lands them on the correct side.
+    --guides    draw bleed and safe-area guides
 
 Examples:
 
-    deck export png --type creature --dpi 600 --out dist/hi-res
-    deck export sheet --copies --page LETTER --margin 12 --out dist/print.pdf
-    deck export pdf --id creature-ember-whelp --guides --out proof.pdf
+    deck export --type creature --dpi 600 --out dist/hi-res
+    deck export --type token --rounded --out /tmp/tokens
+    deck export --id creature-ember-whelp --guides --out /tmp/proof
+    deck export --where faction=chaos --name '{index}-{name}.png' --out /tmp/chaos
+
+## deck print-plan
+
+Lays the rendered PNGs onto sheets and writes a script that calls
+[print-cards](https://github.com/mandaloriat/print-cards).
+
+    -o, --out <dir>          where to write the plan (default: <output.dir>/print)
+    --images <dir>           where the PNGs are (default: <output.dir>/cards)
+    --name <pattern>         the pattern they were rendered with
+    --page <format>          A3 A4 A5 Letter Legal and the L landscape variants
+    --margin <length>        smallest acceptable page margin when fitting the grid
+    --spacing-h <length>     horizontal gap between components
+    --spacing-v <length>     vertical gap between components
+    --columns <n>            force a column count
+    --rows <n>               force a row count
+    --duplex <mode>          none | long-edge | short-edge
+    --no-copies              lay out one of each instead of honouring copies
+    --bleed-width <length>   solid bleed border print-cards should add
+    --bleed-color <hex>      colour of that border
+    --image-fit <mode>       fit | fill | stretch | crop
+    --command <name>         the print-cards executable to call
+
+It writes `print-cards.sh` and `plan.json` into the output directory:
+
+    deck build
+    deck print-plan --page A4 --bleed-width 2 --bleed-color '#1d1d1d'
+    sh dist/print/print-cards.sh
+
+What it decides, and print-cards cannot: which component goes in which cell, and
+how back sheets mirror so duplex printing lines up. Components are grouped by
+size, since one run of print-cards has one element size, so a deck of cards and a
+sheet of tokens become separate sheets automatically.
+
+Page formats are the ones print-cards accepts, so the plan needs no translation
+on either side. Cells left over on the last sheet of a group are covered with a
+transparent placeholder, because print-cards drops to interactive prompts unless
+every position is accounted for, and because keeping the grid identical across
+sheets is what makes pre-cut stock line up.
 
 ## deck watch
 
 Rebuilds on any change under the project directory, ignoring `dist/`,
-`node_modules/` and `.git/`. `--no-profiles` keeps the loop fast.
+`node_modules/` and `.git/`.
 
 ## deck doctor
 
@@ -125,10 +158,10 @@ two machines.
 ## Using it from an agent
 
 - `deck validate --json` before and after an edit; a non-empty `diagnostics`
-  array names the file, the card and the fix.
-- `deck cards --json` to read the deck without parsing CSV.
-- `deck export png --id <card> --out /tmp/preview` to look at one card.
-- `dist/manifest.json` to map card ids to rendered files.
+  array names the file, the component and the fix.
+- `deck cards --json` to read the project without parsing CSV.
+- `deck export --id <component> --out /tmp/preview` to look at one thing.
+- `dist/manifest.json` to map ids to rendered files and pixel sizes.
 
 Nothing prompts, nothing writes outside the output directory, and every failure
 carries a code.

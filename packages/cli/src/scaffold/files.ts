@@ -22,30 +22,6 @@ styles:
 icons:
   dir: assets/icons
 
-profiles:
-  # Home printing: cards tiled edge to edge, cut on the crop marks.
-  print:
-    kind: sheet
-    page: A4
-    margin: 10
-    gutter: 0
-    bleed: false
-    marks: true
-    duplex: long-edge
-  # Professional printing:each card cut individually, so bleeds need room.
-  print-bleed:
-    kind: sheet
-    page: A4
-    margin: 10
-    gutter: 6
-    bleed: true
-    marks: true
-    duplex: long-edge
-  proofs:
-    kind: single
-    bleed: false
-    backs: interleave
-
 cardTypes:
   - id: creature
     name: Creature
@@ -63,6 +39,25 @@ cardTypes:
       rules: { type: richtext }
       flavour: { type: text }
       art: { type: image }
+
+  # Components are not only cards: a type is just a size, a template and rows.
+  - id: token
+    name: Token
+    template: templates/token.liquid
+    styles:
+      - templates/token.css
+    data: data/tokens.csv
+    idFrom: label
+    card:
+      width: 25
+      height: 25
+      bleed: 2
+      cornerRadius: 12.5
+    fields:
+      label: { type: text, required: true, maxLength: 12 }
+      value: { type: integer, default: 1 }
+      icon: { type: enum, values: [attack, health, energy], default: energy }
+      tint: { type: color, default: '#2f5f8f' }
 `,
 
   'templates/base.css': `/*
@@ -253,20 +248,65 @@ Tidecaller,3,order,1,4,"Draw a card when an ally leaves play.",
 
   'assets/icons/energy.svg': `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/></svg>`,
 
+  'templates/token.liquid': `<div class="token" style="--tint: {{ card.tint }}">
+  <img class="glyph" src="{{ icons[card.icon] }}" alt="{{ card.icon }}" />
+  <span class="value">{{ card.raw.value }}</span>
+  <span class="label" data-autofit data-autofit-max="2.2mm" data-autofit-min="1.4mm">{{ card.label }}</span>
+</div>
+`,
+
+  'templates/token.css': `.token {
+  position: absolute;
+  inset: calc(-1 * var(--dd-bleed));
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.4mm;
+  background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--tint) 70%, #fff), var(--tint));
+  color: #fff;
+  text-align: center;
+}
+.token .glyph {
+  height: 5mm;
+  filter: brightness(0) invert(1);
+  opacity: 0.9;
+}
+.token .value {
+  font-size: 5mm;
+  font-weight: 700;
+  line-height: 1;
+}
+.token .label {
+  max-width: 18mm;
+  font-size: 2.2mm;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.85;
+}
+`,
+
+  'data/tokens.csv': `label,value,icon,tint
+Damage,1,attack,#8f2f3f
+Shield,2,health,#2f5f8f
+Energy,3,energy,#3f7a45
+`,
+
   '.gitignore': `dist/
 node_modules/
 `,
 
   'README.md': `# Starter Deck
 
-A deck-designer project.
+A deck-designer project: a card type and a token type, to show that a component
+is just a size, a template and some rows.
 
     deck validate        # schema, data and template checks
-    deck cards           # what is in the deck
-    deck build           # images + every profile in deck.yaml
-    deck export sheet --out dist/print.pdf
+    deck cards           # what is in the project
+    deck build           # PNGs at 300dpi plus dist/manifest.json
+    deck export --type token --dpi 600 --out /tmp/tokens
+    deck print-plan      # sheet layout handed to print-cards
 
-Card data lives in \`data/\`, layout in \`templates/\`, artwork in \`assets/\`.
+Data lives in \`data/\`, layout in \`templates/\`, artwork in \`assets/\`.
 Everything is plain text, so \`git diff\` shows exactly what changed.
 `,
 };

@@ -2,17 +2,9 @@ import {
   collectCss,
   galleryBody,
   htmlDocument,
-  impose,
-  pageCss,
   rasterFrame,
-  sheetBody,
-  singleBody,
-  singlePageCss,
-  toUnits,
   type ComposedCard,
   type Diagnostic,
-  type Geometry,
-  type Imposition,
   type Project,
 } from '@deck-designer/core';
 import type { BrowserContext, ConsoleMessage, Page } from 'playwright-core';
@@ -31,9 +23,9 @@ export interface RenderedImage {
 export interface RenderFlags {
   /** Include the bleed area in the output. */
   bleed: boolean;
-  /** Round the corners (useful for virtual tabletops, wrong for print). */
+  /** Round the corners. Right for virtual tabletops, wrong for anything cut by hand. */
   rounded: boolean;
-  /** Draw bleed/safe-area guides. Proofing aid, never for final output. */
+  /** Draw bleed and safe-area guides. A proofing aid, never final output. */
   guides: boolean;
 }
 
@@ -43,21 +35,21 @@ export interface RendererOptions {
   dpi?: number;
   allowNetwork?: boolean;
   concurrency?: number;
-  /** Cards rendered per browser page during raster capture. */
+  /** Components rendered per browser page during capture. */
   batchSize?: number;
 }
 
 interface PageDiagnostics {
   errors: string[];
   failedRequests: string[];
-  /** Cards whose auto-fitting text still overflows at the minimum size. */
+  /** Components whose auto-fitting text still overflows at the minimum size. */
   overflowing: string[];
 }
 
 /**
  * Owns the browser, the loopback server and the page pool. One instance renders
- * a whole build, so Chromium starts once instead of once per card, which is the
- * single biggest cost in a naive implementation.
+ * a whole build, so Chromium starts once instead of once per component, which is
+ * the single biggest cost in a naive implementation.
  */
 export class DeckRenderer {
   private constructor(
@@ -105,7 +97,7 @@ export class DeckRenderer {
     await this.server.close();
   }
 
-  /** Rasterises each card as its own PNG. */
+  /** Rasterises each component face as its own PNG. */
   async renderImages(
     composed: readonly ComposedCard[],
     flags: RenderFlags = DEFAULT_FLAGS,
@@ -115,7 +107,6 @@ export class DeckRenderer {
       batches.push(composed.slice(i, i + this.options.batchSize));
     }
 
-    const images: RenderedImage[] = [];
     const diagnostics: Diagnostic[] = [];
     const results = new Array<RenderedImage[]>(batches.length);
 
@@ -137,8 +128,7 @@ export class DeckRenderer {
       const captured: RenderedImage[] = [];
       for (let i = 0; i < batch.length; i += 1) {
         const item = batch[i] as ComposedCard;
-        const element = page.locator(`[data-slot="${i}"]`);
-        const buffer = await element.screenshot({
+        const buffer = await page.locator(`[data-slot="${i}"]`).screenshot({
           type: 'png',
           omitBackground: this.project.render.background === 'transparent',
           animations: 'disabled',
@@ -157,96 +147,7 @@ export class DeckRenderer {
       results[index] = captured;
     });
 
-    for (const batch of results) images.push(...(batch ?? []));
-    return { images, diagnostics };
-  }
-
-  /** One card per page, page size equal to the card. */
-  async renderSinglePdf(
-    composed: readonly ComposedCard[],
-    flags: RenderFlags = DEFAULT_FLAGS,
-  ): Promise<{ pdf: Buffer; diagnostics: Diagnostic[] }> {
-    const geometry = composed[0]?.geometry;
-    if (!geometry) throw new Error('Nothing to export.');
-    this.assertUniformGeometry(composed, geometry);
-
-    const page = singlePageCss(geometry, flags.bleed);
-    const html = this.buildDocument({
-      body: singleBody(composed, { includeBleed: flags.bleed, rounded: flags.rounded, guides: flags.guides }),
-      typeIds: composed.map((c) => c.typeId),
-      pageCss: page.css,
-    });
-    return this.pdf(html);
-  }
-
-  /** Imposed print sheets with crop marks and duplex-aware back pages. */
-  async renderSheetPdf(
-    composed: readonly ComposedCard[],
-    layout: {
-      page: { width: number; height: number };
-      margin: number;
-      gutter: number;
-      columns?: number;
-      rows?: number;
-      duplex: 'none' | 'long-edge' | 'short-edge';
-      marks: boolean;
-    },
-    flags: RenderFlags = DEFAULT_FLAGS,
-  ): Promise<{ pdf: Buffer; imposition: Imposition; diagnostics: Diagnostic[] }> {
-    const geometry = composed[0]?.geometry;
-    if (!geometry) throw new Error('Nothing to export.');
-    this.assertUniformGeometry(composed, geometry);
-
-    const bleed = flags.bleed ? geometry.bleed : 0;
-    const cell = { width: geometry.width + bleed * 2, height: geometry.height + bleed * 2 };
-    const imposition = impose(toUnits(composed), {
-      page: layout.page,
-      cell,
-      margin: layout.margin,
-      gutter: layout.gutter,
-      ...(layout.columns !== undefined ? { columns: layout.columns } : {}),
-      ...(layout.rows !== undefined ? { rows: layout.rows } : {}),
-      duplex: layout.duplex,
-    });
-
-    const html = this.buildDocument({
-      body: sheetBody(imposition, {
-        includeBleed: flags.bleed,
-        rounded: flags.rounded,
-        guides: flags.guides,
-        marks: { enabled: layout.marks },
-        bleed,
-      }),
-      typeIds: composed.map((c) => c.typeId),
-      pageCss: pageCss(layout.page),
-    });
-
-    const { pdf, diagnostics } = await this.pdf(html);
-    // Tiled cards share their bleed with the neighbour they touch, so cutting on
-    // the trim line eats into the next card. Professional printing needs a
-    // gutter of twice the bleed; home printing usually drops the bleed instead.
-    if (bleed > 0 && layout.gutter < bleed * 2) {
-      diagnostics.push({
-        severity: 'warning',
-        code: 'layout/bleed-overlap',
-        message: `Cards are tiled with ${bleed}mm bleed but only a ${layout.gutter}mm gutter, so adjacent bleeds overlap.`,
-        hint: `Set the gutter to ${bleed * 2}mm, or export without bleed for cut-on-the-line home printing.`,
-      });
-    }
-    return { pdf, imposition, diagnostics };
-  }
-
-  private assertUniformGeometry(composed: readonly ComposedCard[], geometry: Geometry): void {
-    const mismatch = composed.find(
-      (c) => c.geometry.width !== geometry.width || c.geometry.height !== geometry.height,
-    );
-    if (mismatch) {
-      throw new Error(
-        `Cards of different sizes cannot share one export. "${mismatch.card.id}" is ` +
-          `${mismatch.geometry.width}x${mismatch.geometry.height}mm, expected ` +
-          `${geometry.width}x${geometry.height}mm. Export one card type at a time.`,
-      );
-    }
+    return { images: results.flatMap((batch) => batch ?? []), diagnostics };
   }
 
   private buildDocument(input: { body: string; typeIds: readonly string[]; pageCss?: string }): string {
@@ -258,24 +159,6 @@ export class DeckRenderer {
       background: this.project.render.background,
       ...(input.pageCss ? { pageCss: input.pageCss } : {}),
     });
-  }
-
-  private async pdf(html: string): Promise<{ pdf: Buffer; diagnostics: Diagnostic[] }> {
-    const page = await this.context.newPage();
-    try {
-      const problems = await this.load(page, html);
-      // Screen media keeps PNG and PDF output identical; @page rules still apply.
-      await page.emulateMedia({ media: 'screen' });
-      const pdf = await page.pdf({
-        printBackground: true,
-        preferCSSPageSize: true,
-        scale: 1,
-        displayHeaderFooter: false,
-      });
-      return { pdf, diagnostics: this.toDiagnostics(problems) };
-    } finally {
-      await page.close();
-    }
   }
 
   private async load(page: Page, html: string): Promise<PageDiagnostics> {
@@ -295,8 +178,7 @@ export class DeckRenderer {
     page.on('requestfailed', onRequestFailed);
 
     try {
-      const url = this.server.publish(html);
-      await page.goto(url, { waitUntil: 'load' });
+      await page.goto(this.server.publish(html), { waitUntil: 'load' });
       await page.waitForFunction(() => document.documentElement.dataset['ddReady'] !== undefined, undefined, {
         timeout: this.project.render.timeoutMs,
       });

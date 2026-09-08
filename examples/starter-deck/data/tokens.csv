@@ -1,0 +1,4 @@
+label,value,icon,tint
+Damage,1,attack,#8f2f3f
+Shield,2,health,#2f5f8f
+Energy,3,energy,#3f7a45

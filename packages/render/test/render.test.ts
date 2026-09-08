@@ -34,9 +34,13 @@ describe.skipIf(!chromiumAvailable)('DeckRenderer', () => {
     await renderer?.close();
   });
 
-  it('rasterises cards at exactly the requested resolution', async () => {
+  it('rasterises at exactly the requested resolution', async () => {
     const { cards } = await resolveCards(project);
-    const composed = await composeCards(project, cards.slice(0, 2), { faces: ['front'] });
+    const composed = await composeCards(
+      project,
+      cards.filter((c) => c.type === 'creature').slice(0, 2),
+      { faces: ['front'] },
+    );
     const { images, diagnostics } = await renderer.renderImages(composed);
 
     expect(diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
@@ -49,31 +53,33 @@ describe.skipIf(!chromiumAvailable)('DeckRenderer', () => {
     }
   });
 
-  it('produces a vector PDF with one page per card face', async () => {
+  it('renders components of different sizes in one pass', async () => {
     const { cards } = await resolveCards(project);
-    const composed = await composeCards(project, cards.slice(0, 2), { faces: ['front', 'back'] });
-    const { pdf } = await renderer.renderSinglePdf(composed);
+    const mixed = [
+      cards.find((c) => c.type === 'creature'),
+      cards.find((c) => c.type === 'token'),
+    ].filter((c): c is NonNullable<typeof c> => c !== undefined);
+    expect(mixed).toHaveLength(2);
 
-    expect(pdf.subarray(0, 5).toString('ascii')).toBe('%PDF-');
-    // The page tree node also matches /Type /Page, hence the extra entry.
-    expect(countPages(pdf)).toBe(4);
-    expect(pdf.includes(Buffer.from('/FontFile'))).toBe(true);
+    const composed = await composeCards(project, mixed, { faces: ['front'] });
+    const { images } = await renderer.renderImages(composed);
+    const sizes = images.map((image) => pngSize(image.buffer));
+
+    expect(sizes).toContainEqual({ width: 744, height: 1039 });
+    // 25mm at 300dpi.
+    expect(sizes).toContainEqual({ width: 295, height: 295 });
   });
 
-  it('imposes sheets with mirrored back pages', async () => {
+  it('honours the bleed flag in the output size', async () => {
     const { cards } = await resolveCards(project);
-    const composed = await composeCards(project, cards, { faces: ['front', 'back'] });
-    const { pdf, imposition } = await renderer.renderSheetPdf(composed, {
-      page: { width: 210, height: 297 },
-      margin: 10,
-      gutter: 0,
-      duplex: 'long-edge',
-      marks: true,
+    const composed = await composeCards(project, cards.slice(0, 1), { faces: ['front'] });
+    const { images } = await renderer.renderImages(composed, {
+      bleed: true,
+      rounded: false,
+      guides: false,
     });
-
-    expect(imposition.grid).toEqual({ columns: 3, rows: 3 });
-    expect(imposition.pages.map((p) => p.face)).toEqual(['front', 'back']);
-    expect(countPages(pdf)).toBe(2);
+    // 63x88mm plus 3mm of bleed on every side, at 300dpi.
+    expect(pngSize(images[0]?.buffer as Buffer)).toEqual({ width: 815, height: 1110 });
   });
 
   it('blocks outbound requests so a build cannot depend on the network', async () => {
@@ -114,9 +120,3 @@ cardTypes:
     }
   });
 });
-
-function countPages(pdf: Buffer): number {
-  const text = pdf.toString('latin1');
-  const pages = (text.match(/\/Type\s*\/Page[^s]/g) ?? []).length;
-  return pages;
-}

@@ -1,5 +1,5 @@
 import type { FieldDef } from '../schema/fields.js';
-import type { ProfileConfig, ProjectConfig } from '../schema/project.js';
+import type { ProjectConfig } from '../schema/project.js';
 import type { Unit } from '../util/units.js';
 
 /** All lengths in millimetres. */
@@ -9,11 +9,6 @@ export interface Geometry {
   bleed: number;
   safe: number;
   cornerRadius: number;
-}
-
-/** Card geometry with the bleed area included. */
-export function bleedBox(g: Geometry): { width: number; height: number } {
-  return { width: g.width + g.bleed * 2, height: g.height + g.bleed * 2 };
 }
 
 export interface ResolvedFont {
@@ -33,6 +28,8 @@ export interface ResolvedCardType {
   geometry: Geometry;
   fields: Record<string, FieldDef>;
   defaults: Record<string, unknown>;
+  /** Field an id is derived from when a row has no explicit `id`. */
+  idFrom: string;
   templatePath: string;
   templateSource: string;
   backPath?: string;
@@ -54,7 +51,6 @@ export interface Project {
   render: ProjectConfig['render'];
   fonts: ResolvedFont[];
   outputDir: string;
-  profiles: Record<string, ProfileConfig>;
   /** Icon token -> root-relative URL, discovered from `icons.dir`. */
   icons: Record<string, string>;
   /** Absolute stylesheet path -> its contents, shared across card types. */

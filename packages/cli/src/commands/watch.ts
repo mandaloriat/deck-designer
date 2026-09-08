@@ -12,8 +12,8 @@ const IGNORED = new Set(['node_modules', '.git', 'dist', 'out']);
 
 /**
  * Rebuilds on change. Deliberately a plain rebuild rather than an incremental
- * one: a deck is small enough that a full pass is fast, and partial state is
- * where card tools usually start producing stale output.
+ * one: a project is small enough that a full pass is fast, and partial state is
+ * where this kind of tool usually starts producing stale output.
  */
 export async function watchCommand(options: WatchOptions, reporter: Reporter): Promise<CommandResult> {
   const configPath = await findProjectFile(path.resolve(options.project ?? process.cwd()));

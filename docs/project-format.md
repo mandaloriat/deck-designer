@@ -41,22 +41,7 @@ icons:
 output:
   dir: dist
 
-profiles:            # named exports, all rendered by `deck build`
-  print:
-    kind: sheet
-    page: A4         # or LETTER, A3, or { width: 210, height: 297 }
-    orientation: portrait
-    margin: 10
-    gutter: 0
-    bleed: true
-    marks: true
-    duplex: long-edge   # none | long-edge | short-edge
-  proofs:
-    kind: single
-    bleed: false
-    backs: interleave   # none | interleave | append
-
-cardTypes:
+cardTypes:           # one entry per component type
   - id: creature
     name: Creature
     template: templates/creature.liquid
@@ -65,10 +50,25 @@ cardTypes:
     data: data/creatures.csv        # or a list of files
     card: { width: 70 }             # overrides the deck default
     defaults: { faction: order }    # merged into every row
+    idFrom: name                    # field an id is derived from
     fields:
       name: { type: text, required: true, maxLength: 28 }
       cost: { type: integer, min: 0, default: 0 }
+
+  # A component type is only a size, a template and some rows, so this is a
+  # 25mm round token rather than a card.
+  - id: token
+    template: templates/token.liquid
+    data: data/tokens.csv
+    idFrom: label
+    card: { width: 25, height: 25, bleed: 2, cornerRadius: 12.5 }
+    fields:
+      label: { type: text, required: true }
+      value: { type: integer, default: 1 }
 ```
+
+Component types with different sizes render in the same pass, and
+`deck print-plan` groups them into separate sheets automatically.
 
 Lengths accept a bare number in the project `units`, or an explicit suffix:
 `3`, `"3mm"`, `"0.125in"`, `"9pt"`.
@@ -90,11 +90,11 @@ Shorthand: `cost: integer` is the same as `cost: { type: integer }`.
 
 Three names are reserved and must not be declared as fields:
 
-- `id` — an explicit card id. Without it, an id is derived from the `name` field
-  (`creature-dawn-sentinel`) or, failing that, from the row number.
-- `copies` — print-run multiplier. The card is still listed once; `--copies` and
-  sheet profiles expand it.
-- `type` — the card type id.
+- `id` — an explicit id. Without it, one is derived from the field named by
+  `idFrom` (`creature-dawn-sentinel`) or, failing that, from the row number.
+- `copies` — print-run multiplier. The component is still listed once;
+  `deck print-plan` is what expands it.
+- `type` — the component type id.
 
 ## Data files
 
@@ -137,8 +137,9 @@ custom properties — `--dd-w`, `--dd-h`, `--dd-bleed`, `--dd-safe`, `--dd-radiu
 - `.dd-safe` — a box inset by the safe margin.
 - `.dd-icon` — inline icon sized to the current font.
 
-Because several card types can share one rendered page, scope type-specific rules
-(`.dd-card[data-type='creature'] .title`) rather than styling bare element names.
+Because several component types can share one rendered page, scope type-specific
+rules (`.dd-card[data-type='creature'] .title`) rather than styling bare element
+names.
 
 ### Text that fits
 
@@ -159,9 +160,14 @@ If the text still overflows at the minimum, the build reports a
 
 `deck build` writes:
 
-    dist/cards/<type>/<card-id>.<face>.png
-    dist/<profile>.pdf
+    dist/cards/<type>/<id>.<face>.png
     dist/manifest.json
 
-`manifest.json` carries `schema: "deck-designer/manifest@1"`, every card with its
-resolved values and image paths, and the outputs that were produced.
+`manifest.json` carries `schema: "deck-designer/manifest@1"`, the geometry of
+every component type, and every component with its resolved values, its rendered
+image paths and pixel sizes, and the data file and row it came from.
+
+The filename layout comes from `--name`, whose default is
+`{type}/{id}.{face}.png`. Available tokens are `{id}`, `{type}`, `{face}`,
+`{name}` (the slugified `idFrom` field) and `{index}`, which is 1-based within a
+type and zero-padded so a directory listing sorts in project order.

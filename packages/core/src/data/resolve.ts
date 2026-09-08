@@ -120,9 +120,9 @@ function deriveId(
   const explicit = merged['id'];
   if (typeof explicit === 'string' && explicit.trim() !== '') return explicit.trim();
   if (typeof explicit === 'number') return String(explicit);
-  const name = values['name'];
-  if (typeof name === 'string' && name.trim() !== '') {
-    const slug = slugify(name);
+  const label = values[type.idFrom];
+  if (typeof label === 'string' && label.trim() !== '') {
+    const slug = slugify(label);
     if (slug) return `${type.id}-${slug}`;
   }
   return `${type.id}-${index + 1}`;

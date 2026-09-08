@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 import { Command, Option } from 'commander';
-import { EXIT, Reporter, type CommandResult, type GlobalOptions } from './output.js';
+import { Reporter, type CommandResult, type GlobalOptions } from './output.js';
 import { validateCommand } from './commands/validate.js';
 import { cardsCommand } from './commands/cards.js';
 import { buildCommand } from './commands/build.js';
-import { exportCommand, type ExportFormat } from './commands/export.js';
+import { exportCommand } from './commands/export.js';
+import { printPlanCommand } from './commands/print-plan.js';
 import { initCommand } from './commands/init.js';
 import { doctorCommand } from './commands/doctor.js';
 import { watchCommand } from './commands/watch.js';
+import { pageFormatNames } from './geometry.js';
 
 const VERSION = '0.1.0';
 
@@ -35,21 +37,34 @@ async function run(
   process.exitCode = code;
 }
 
-/** Options shared by every command that reads a deck. */
+/** Options shared by every command that reads a project. */
 function withSelection(command: Command): Command {
   return command
     .option('-p, --project <path>', 'project directory or deck.yaml')
-    .option('-t, --type <id...>', 'restrict to card types')
-    .option('-i, --id <cardId...>', 'restrict to card ids')
+    .option('-t, --type <id...>', 'restrict to component types')
+    .option('-i, --id <componentId...>', 'restrict to component ids')
     .option('-w, --where <field=value...>', 'restrict to rows matching a field value')
-    .option('-n, --limit <count>', 'take at most this many cards', (v) => Number.parseInt(v, 10));
+    .option('-n, --limit <count>', 'take at most this many', (v) => Number.parseInt(v, 10));
+}
+
+/** Options shared by the two commands that rasterise. */
+function withRender(command: Command): Command {
+  return command
+    .option('-o, --out <dir>', 'output directory')
+    .option('--dpi <number>', 'output resolution', (v) => Number.parseInt(v, 10))
+    .option('--face <face...>', 'faces to render: front, back')
+    .option('--name <pattern>', 'filename pattern, e.g. "{type}/{id}.{face}.png"')
+    .option('--bleed', 'include the bleed area')
+    .option('--rounded', 'round the corners')
+    .option('--concurrency <number>', 'parallel render pages', (v) => Number.parseInt(v, 10))
+    .option('--allow-network', 'let the page make outbound requests (breaks reproducibility)');
 }
 
 const program = new Command();
 
 program
   .name('deck')
-  .description('Headless card deck designer: data in, print-ready cards out.')
+  .description('Render game components from data and HTML/CSS templates, headlessly.')
   .version(VERSION)
   .option('--json', 'emit a machine-readable result on stdout')
   .option('-q, --quiet', 'suppress progress output')
@@ -58,18 +73,16 @@ program
 
 program
   .command('init')
-  .description('scaffold a new deck project')
+  .description('scaffold a new project')
   .argument('[dir]', 'target directory', '.')
-  .option('--name <name>', 'deck name')
+  .option('--name <name>', 'project name')
   .option('-f, --force', 'overwrite existing files')
   .action(async (dir: string, options, command: Command) => {
     await run('init', command, (reporter) => initCommand(dir, options, reporter));
   });
 
 withSelection(
-  program
-    .command('validate')
-    .description('check config, data, assets and templates without rendering'),
+  program.command('validate').description('check config, data, assets and templates without rendering'),
 )
   .option('--strict', 'treat warnings as errors')
   .option('--no-templates', 'skip template compilation')
@@ -77,67 +90,53 @@ withSelection(
     await run('validate', command, (reporter) => validateCommand(options, reporter));
   });
 
-withSelection(program.command('cards').description('list the cards in the deck'))
+withSelection(program.command('cards').description('list the components in the project'))
   .option('--fields <name...>', 'columns to show')
   .action(async (options, command: Command) => {
     await run('cards', command, (reporter) => cardsCommand(options, reporter));
   });
 
-withSelection(program.command('build').description('render images, profiles and a manifest'))
-  .option('-o, --out <dir>', 'output directory (default: the project output.dir)')
-  .option('--dpi <number>', 'raster resolution', (v) => Number.parseInt(v, 10))
-  .option('--face <face...>', 'faces to render: front, back')
-  .option('--no-images', 'skip card images')
-  .option('--no-profiles', 'skip PDF profiles')
+withRender(withSelection(program.command('build').description('render every component and write a manifest')))
   .option('--clean', 'remove the output directory first')
-  .option('--concurrency <number>', 'parallel render pages', (v) => Number.parseInt(v, 10))
-  .option('--allow-network', 'let the page make outbound requests (breaks reproducibility)')
   .action(async (options, command: Command) => {
     await run('build', command, (reporter) => buildCommand(options, reporter));
   });
 
-const exportCmd = withSelection(
-  program
-    .command('export')
-    .description('render one output')
-    .argument('<format>', 'png | pdf | sheet'),
-)
-  .option('-o, --out <path>', 'output file or directory')
-  .option('--dpi <number>', 'raster resolution', (v) => Number.parseInt(v, 10))
-  .option('--face <face...>', 'faces to render: front, back')
-  .option('--bleed', 'include the bleed area')
-  .option('--no-bleed', 'trim to the card size')
-  .option('--rounded', 'round the corners (for virtual tabletops, not for print)')
+withRender(withSelection(program.command('export').description('render a selection to PNG')))
   .option('--guides', 'draw bleed and safe-area guides')
-  .option('--copies', 'repeat each card by its copies count')
-  .option('--page <size>', 'sheet page size: A4, LETTER, or WxH', 'A4')
-  .addOption(new Option('--orientation <mode>', 'sheet orientation').choices(['portrait', 'landscape']))
-  .option('--margin <length>', 'sheet margin')
-  .option('--gutter <length>', 'space between cards')
+  .action(async (options, command: Command) => {
+    await run('export', command, (reporter) => exportCommand(options, reporter));
+  });
+
+withSelection(
+  program
+    .command('print-plan')
+    .description('lay rendered PNGs onto sheets and emit print-cards commands'),
+)
+  .option('-o, --out <dir>', 'where to write the plan (default: <output.dir>/print)')
+  .option('--images <dir>', 'where the rendered PNGs are (default: <output.dir>/cards)')
+  .option('--name <pattern>', 'the filename pattern they were rendered with')
+  .addOption(new Option('--page <format>', 'sheet format').choices(pageFormatNames()).default('A4'))
+  .option('--margin <length>', 'smallest acceptable page margin when fitting the grid', '5')
+  .option('--spacing-h <length>', 'horizontal gap between components', '0')
+  .option('--spacing-v <length>', 'vertical gap between components', '0')
   .option('--columns <n>', 'force a column count', (v) => Number.parseInt(v, 10))
   .option('--rows <n>', 'force a row count', (v) => Number.parseInt(v, 10))
-  .addOption(new Option('--duplex <mode>', 'back-page mirroring').choices(['none', 'long-edge', 'short-edge']))
-  .option('--no-marks', 'omit crop marks')
-  .option('--concurrency <number>', 'parallel render pages', (v) => Number.parseInt(v, 10))
-  .option('--allow-network', 'let the page make outbound requests (breaks reproducibility)');
-
-exportCmd.action(async (format: string, options, command: Command) => {
-  if (!['png', 'pdf', 'sheet'].includes(format)) {
-    process.stderr.write(`Unknown format "${format}". Use png, pdf or sheet.\n`);
-    process.exitCode = EXIT.usage;
-    return;
-  }
-  await run('export', command, (reporter) => exportCommand(format as ExportFormat, options, reporter));
-});
-
-withSelection(program.command('watch').description('rebuild on file changes'))
-  .option('-o, --out <dir>', 'output directory')
-  .option('--dpi <number>', 'raster resolution', (v) => Number.parseInt(v, 10))
-  .option('--face <face...>', 'faces to render: front, back')
-  .option('--no-profiles', 'skip PDF profiles while watching')
+  .addOption(new Option('--duplex <mode>', 'back-sheet mirroring').choices(['none', 'long-edge', 'short-edge']))
+  .option('--no-copies', 'lay out one of each component instead of honouring copies')
+  .option('--bleed-width <length>', 'solid bleed border print-cards should add')
+  .option('--bleed-color <hex>', 'colour of that border')
+  .addOption(new Option('--image-fit <mode>', 'how print-cards fits images').choices(['fit', 'fill', 'stretch', 'crop']))
+  .option('--command <name>', 'the print-cards executable to call', 'print-cards')
   .action(async (options, command: Command) => {
-    await run('watch', command, (reporter) => watchCommand(options, reporter));
+    await run('print-plan', command, (reporter) => printPlanCommand(options, reporter));
   });
+
+withRender(withSelection(program.command('watch').description('rebuild on file changes'))).action(
+  async (options, command: Command) => {
+    await run('watch', command, (reporter) => watchCommand(options, reporter));
+  },
+);
 
 program
   .command('doctor')
