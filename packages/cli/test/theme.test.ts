@@ -3,6 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { validateCommand } from '../src/commands/validate.js';
+import { Reporter } from '../src/output.js';
 import { startPreviewServer, type PreviewServer } from '../src/preview/server.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -122,5 +124,39 @@ describe('theme endpoint off loopback', () => {
     const reply = await post(server, { name: '--ink', value: '#000000' });
     expect(reply.status).toBe(403);
     expect(reply.body.error).toMatchObject({ code: 'preview/not-loopback' });
+  });
+});
+
+describe('deck validate', () => {
+  let root: string;
+
+  beforeAll(async () => {
+    root = await fs.mkdtemp(path.join(os.tmpdir(), 'deck-theme-validate-'));
+    await fs.cp(EXAMPLE, root, { recursive: true });
+  });
+
+  afterAll(async () => {
+    await fs.rm(root, { recursive: true, force: true });
+  });
+
+  it('reports a theme knob nothing declares, so CI catches the typo', async () => {
+    // Without this the mistake surfaces only as a control that never appeared,
+    // and only to whoever happens to open the preview.
+    const config = path.join(root, 'deck.yaml');
+    await fs.writeFile(config, (await fs.readFile(config, 'utf8')).replace('  - --ink\n', '  - --ink\n  - --inkk\n'));
+
+    const reporter = new Reporter({ json: true, quiet: true, color: false });
+    const result = await validateCommand({ project: root, templates: false, strict: true }, reporter);
+    const themes = (result.diagnostics ?? []).filter((d) => d.code.startsWith('theme/'));
+    expect(themes).toHaveLength(1);
+    expect(themes[0]).toMatchObject({ code: 'theme/not-declared', severity: 'warning' });
+    // --strict makes a warning fail the run, which is what CI would use.
+    expect(result.exitCode).toBe(2);
+  });
+
+  it('is quiet when every knob resolves', async () => {
+    const reporter = new Reporter({ json: true, quiet: true, color: false });
+    const result = await validateCommand({ project: EXAMPLE, templates: false, strict: true }, reporter);
+    expect(result.diagnostics ?? []).toEqual([]);
   });
 });

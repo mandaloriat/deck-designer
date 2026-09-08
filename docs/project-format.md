@@ -243,7 +243,9 @@ an empty control, and a name declared in several stylesheets is reported as
 `theme/shadowed` with the file the cascade actually uses, which is the one the
 panel edits. Because `theme:` is deck-wide, a knob whose declaration sits in one
 component type's stylesheet reaches only that type; that is `theme/partial`, and
-it names the types the control will appear to do nothing for.
+it names the types the control will appear to do nothing for. All three are
+reported by `deck validate` as well as in the preview, so a mistyped knob fails
+in CI rather than waiting to be noticed as a control that never appeared.
 
 Commented-out declarations are not knobs. A theme stylesheet is where alternatives
 get parked, so `/* --ink: red; */` is skipped for reading, counting and writing
