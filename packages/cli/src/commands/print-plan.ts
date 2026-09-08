@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import { constants as fsConstants } from 'node:fs';
 import path from 'node:path';
 import {
   expandCopies,
@@ -220,6 +221,17 @@ export async function printPlanCommand(
   const scriptPath = path.join(outDir, 'print-cards.sh');
   await fs.writeFile(scriptPath, script, { mode: 0o755 });
 
+  if (!(await isRunnable(command))) {
+    diagnostics.push({
+      severity: 'warning',
+      code: 'print/command-missing',
+      message: `The plan calls \`${command}\`, which is not on PATH; the script will not run as written.`,
+      hint:
+        'Install it from https://github.com/mandaloriat/print-cards, then either activate its virtualenv ' +
+        'or pass --command with the path to the executable.',
+    });
+  }
+
   reporter.info(`Wrote ${invocations.length} sheet(s) to ${scriptPath}`);
   reporter.info(`Run: sh ${path.relative(process.cwd(), scriptPath)}`);
 
@@ -291,6 +303,30 @@ async function imagePaths(
     out.set(card.id, entry);
   }
   return out;
+}
+
+/**
+ * The plan is worth writing either way, but saying "run this" without checking
+ * turns a missing tool into a shell error on line 8 of a generated file.
+ */
+async function isRunnable(command: string): Promise<boolean> {
+  if (command.includes(path.sep) || command.startsWith('.')) {
+    return executable(path.resolve(command));
+  }
+  const dirs = (process.env['PATH'] ?? '').split(path.delimiter).filter(Boolean);
+  for (const dir of dirs) {
+    if (await executable(path.join(dir, command))) return true;
+  }
+  return false;
+}
+
+async function executable(file: string): Promise<boolean> {
+  try {
+    await fs.access(file, fsConstants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function exists(file: string): Promise<boolean> {
