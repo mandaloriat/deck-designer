@@ -21,6 +21,11 @@ anything, which is why most of the test suite runs in a second.
 millimetres, reads templates and stylesheets, and indexes `assets/icons`. Paths
 are checked against the project root: a project cannot read files above it.
 
+Every source format collapses into `RawRow` before anything else runs, so adding
+one costs a reader function and nothing downstream changes. A row can carry an id
+implied by its source (a Markdown file's basename) and a body, which is how one
+file per component works without the resolver knowing about files.
+
 **resolve** turns data rows into typed items. Each carries two views of its
 values: `values`, canonical and unescaped, used by `deck cards` and the manifest;
 and `view`, render-ready, with text HTML-escaped, rich text sanitised, and image

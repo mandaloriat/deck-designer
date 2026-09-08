@@ -35,7 +35,7 @@ export const cardTypeSchema = z.object({
   /** Optional back template. Omit for a single-sided deck. */
   back: z.string().optional(),
   styles: z.array(z.string()).default([]),
-  /** One or more data files (`.csv`, `.yaml`, `.json`). */
+  /** Data files or directories. A directory means every data file inside it. */
   data: z.union([z.string(), z.array(z.string())]).optional(),
   /** Inline rows, useful for tiny decks and tests. */
   cards: z.array(z.record(z.unknown())).optional(),
@@ -45,6 +45,8 @@ export const cardTypeSchema = z.object({
   defaults: z.record(z.unknown()).default({}),
   /** Field an id is derived from when a row has no explicit `id`. */
   idFrom: z.string().default('name'),
+  /** Field that a Markdown file's body text fills. Defaults to the sole richtext field. */
+  body: z.string().optional(),
 });
 
 export const renderSchema = z.object({
