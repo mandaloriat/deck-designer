@@ -7,7 +7,7 @@ import { chromium, type Browser, type BrowserContext } from 'playwright-core';
  * depend on the host's font stack; turning them off is what lets golden-image
  * tests compare byte-for-byte across machines.
  */
-const LAUNCH_ARGS = [
+const DETERMINISM_ARGS = [
   '--font-render-hinting=none',
   '--disable-lcd-text',
   '--disable-font-subpixel-positioning',
@@ -19,6 +19,32 @@ const LAUNCH_ARGS = [
   '--disable-renderer-backgrounding',
   '--mute-audio',
 ];
+
+/**
+ * Page requests are already blocked by a route handler, but that only covers
+ * the renderer. The browser process has its own network life: variations seeds,
+ * component and safe-browsing updates, sign-in probes. Those bypass request
+ * interception entirely, so a build that looks hermetic still reaches out to
+ * several hosts. On a locked-down runner they fail slowly; anywhere else they
+ * are traffic nobody asked for.
+ */
+const OFFLINE_ARGS = [
+  '--disable-background-networking',
+  '--disable-component-update',
+  '--disable-domain-reliability',
+  '--disable-sync',
+  '--disable-client-side-phishing-detection',
+  '--safebrowsing-disable-auto-update',
+  '--disable-breakpad',
+  '--metrics-recording-only',
+  '--no-first-run',
+  '--no-default-browser-check',
+  '--disable-default-apps',
+  '--no-pings',
+  '--disable-features=OptimizationHints,MediaRouter,InterestFeedContentSuggestions,Translate',
+];
+
+export const LAUNCH_ARGS = [...DETERMINISM_ARGS, ...OFFLINE_ARGS];
 
 const CANDIDATE_SUFFIXES = [
   'chrome-linux/chrome',

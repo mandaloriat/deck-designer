@@ -1,0 +1,144 @@
+.face {
+  position: absolute;
+  inset: calc(-1 * var(--dd-bleed));
+  background: var(--paper);
+}
+.face[data-suit='denari'] { --accent: var(--denari); }
+.face[data-suit='coppe'] { --accent: var(--coppe); }
+.face[data-suit='spade'] { --accent: var(--spade); }
+.face[data-suit='bastoni'] { --accent: var(--bastoni); }
+
+/* A double rule, the outer one in the suit colour. */
+.frame {
+  position: absolute;
+  inset: calc(var(--dd-bleed) + 3mm);
+  border: 0.5mm solid var(--accent);
+  border-radius: 1.5mm;
+}
+.frame::after {
+  content: '';
+  position: absolute;
+  inset: 1.1mm;
+  border: 0.18mm solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 0.8mm;
+}
+
+/* Corner indices, the lower one rotated so the card reads either way up. */
+.index {
+  position: absolute;
+  display: grid;
+  justify-items: center;
+  gap: 0.6mm;
+  color: var(--accent);
+  line-height: 1;
+}
+.index-tl { left: calc(var(--dd-bleed) + 6mm); top: calc(var(--dd-bleed) + 6mm); }
+.index-br {
+  right: calc(var(--dd-bleed) + 6mm);
+  bottom: calc(var(--dd-bleed) + 6mm);
+  transform: rotate(180deg);
+}
+.index .rank {
+  font-size: 6mm;
+  font-weight: 600;
+  font-variant-numeric: lining-nums;
+}
+.index .mark { width: 3.6mm; height: 3.6mm; --tint: var(--accent); }
+
+/* Pip field: a 3x3 lattice the ranks are placed into by hand, because the
+   traditional arrangements are not what auto-flow would produce. */
+.pips {
+  position: absolute;
+  inset: calc(var(--dd-bleed) + 16mm) calc(var(--dd-bleed) + 13mm);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  place-items: center;
+}
+.pips .mark { width: 8.5mm; height: 8.5mm; --tint: var(--accent); }
+
+[data-rank='1'] .pips .mark { width: 26mm; height: 26mm; }
+[data-rank='1'] .pip:nth-child(1) { grid-area: 2 / 2; }
+
+[data-rank='2'] .pip:nth-child(1) { grid-area: 1 / 2; }
+[data-rank='2'] .pip:nth-child(2) { grid-area: 3 / 2; }
+
+[data-rank='3'] .pip:nth-child(1) { grid-area: 1 / 2; }
+[data-rank='3'] .pip:nth-child(2) { grid-area: 2 / 2; }
+[data-rank='3'] .pip:nth-child(3) { grid-area: 3 / 2; }
+
+[data-rank='4'] .pip:nth-child(1) { grid-area: 1 / 1; }
+[data-rank='4'] .pip:nth-child(2) { grid-area: 1 / 3; }
+[data-rank='4'] .pip:nth-child(3) { grid-area: 3 / 1; }
+[data-rank='4'] .pip:nth-child(4) { grid-area: 3 / 3; }
+
+[data-rank='5'] .pip:nth-child(1) { grid-area: 1 / 1; }
+[data-rank='5'] .pip:nth-child(2) { grid-area: 1 / 3; }
+[data-rank='5'] .pip:nth-child(3) { grid-area: 2 / 2; }
+[data-rank='5'] .pip:nth-child(4) { grid-area: 3 / 1; }
+[data-rank='5'] .pip:nth-child(5) { grid-area: 3 / 3; }
+
+[data-rank='6'] .pip:nth-child(1) { grid-area: 1 / 1; }
+[data-rank='6'] .pip:nth-child(2) { grid-area: 1 / 3; }
+[data-rank='6'] .pip:nth-child(3) { grid-area: 2 / 1; }
+[data-rank='6'] .pip:nth-child(4) { grid-area: 2 / 3; }
+[data-rank='6'] .pip:nth-child(5) { grid-area: 3 / 1; }
+[data-rank='6'] .pip:nth-child(6) { grid-area: 3 / 3; }
+
+[data-rank='7'] .pip:nth-child(1) { grid-area: 1 / 1; }
+[data-rank='7'] .pip:nth-child(2) { grid-area: 1 / 3; }
+[data-rank='7'] .pip:nth-child(3) { grid-area: 2 / 1; }
+[data-rank='7'] .pip:nth-child(4) { grid-area: 2 / 2; }
+[data-rank='7'] .pip:nth-child(5) { grid-area: 2 / 3; }
+[data-rank='7'] .pip:nth-child(6) { grid-area: 3 / 1; }
+[data-rank='7'] .pip:nth-child(7) { grid-area: 3 / 3; }
+
+/* Court cards: an ornament that gains structure with rank, around an initial.
+   Two rows so the suit mark sits under the roundel instead of drifting into
+   the footer. */
+.court {
+  position: absolute;
+  inset: calc(var(--dd-bleed) + 16mm) calc(var(--dd-bleed) + 10mm) calc(var(--dd-bleed) + 16mm);
+  display: grid;
+  grid-template-rows: auto auto;
+  /* align-content, not align-items: the two rows travel together, so the suit
+     mark stays tucked under the roundel instead of falling to the footer. */
+  align-content: center;
+  /* align-content places the rows; align-items centres each item inside its
+     own row, which is what keeps the initial in the middle of the roundel. */
+  align-items: center;
+  justify-items: center;
+  gap: 2.5mm;
+}
+.court .ornament {
+  grid-area: 1 / 1;
+  width: 32mm;
+  height: 32mm;
+  --tint: var(--accent);
+}
+.court .initial {
+  grid-area: 1 / 1;
+  font-size: 15mm;
+  font-weight: 600;
+  color: var(--accent);
+  line-height: 1;
+  padding-bottom: 1mm;
+}
+.court .suit {
+  grid-row: 2;
+  width: 5mm;
+  height: 5mm;
+  --tint: var(--accent);
+}
+
+/* Briscola is scored by card, so the deck carries the values. */
+.points {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--dd-bleed) + 5.4mm);
+  transform: translateX(-50%);
+  font-size: 2.6mm;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ink) 45%, transparent);
+}
