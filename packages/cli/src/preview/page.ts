@@ -172,12 +172,24 @@ export const CHROME_PAGE = `<!doctype html>
     try { localStorage.setItem(STORAGE, JSON.stringify(state)); } catch (e) {}
   }
 
-  function galleryUrl() {
+  /** The filter both endpoints have to agree on, or the counts describe a
+      different set of components than the gallery shows. */
+  function filterParams() {
     var q = new URLSearchParams();
-    q.set('zoom', String(state.zoom));
-    q.set('faces', state.faces);
     if (state.type) q.set('type', state.type);
     if (state.search) q.set('search', state.search);
+    return q;
+  }
+
+  function stateUrl() {
+    var query = filterParams().toString();
+    return '/__preview/state' + (query ? '?' + query : '');
+  }
+
+  function galleryUrl() {
+    var q = filterParams();
+    q.set('zoom', String(state.zoom));
+    q.set('faces', state.faces);
     if (state.bleed) q.set('bleed', '1');
     if (state.guides) q.set('guides', '1');
     if (state.rounded) q.set('rounded', '1');
@@ -200,7 +212,7 @@ export const CHROME_PAGE = `<!doctype html>
     }
     box.innerHTML = list.map(function (d) {
       var where = [d.file, d.cardType && 'type=' + d.cardType, d.card && 'card=' + d.card]
-        .filter(Boolean).join(' &middot; ');
+        .filter(Boolean).map(escapeHtml).join(' &middot; ');
       return '<div class="diag"><span class="sev ' + d.severity + '">' + d.severity + '</span><div>' +
         '<div>' + escapeHtml(d.message) + ' <code>' + escapeHtml(d.code) + '</code></div>' +
         (where ? '<div class="where">' + where + '</div>' : '') +
@@ -216,7 +228,7 @@ export const CHROME_PAGE = `<!doctype html>
   }
 
   function loadState() {
-    fetch('/__preview/state').then(function (r) { return r.json(); }).then(function (data) {
+    fetch(stateUrl()).then(function (r) { return r.json(); }).then(function (data) {
       el('project').textContent = data.error ? '' : ' \\u00b7 ' + data.project;
 
       var select = el('type');

@@ -67,6 +67,25 @@ describe('preview server', () => {
     expect(missing.body).toContain('No components match');
   });
 
+  it('treats a malformed url as a client error, not an internal failure', async () => {
+    // decodeURIComponent throws on a stray %, which used to surface as a 500.
+    expect((await get(server, '/%25zz%')).status).toBe(400);
+  });
+
+  it('asks the state endpoint for the same filter the gallery is showing', async () => {
+    // The chrome cannot be unit tested as a page, but the counts in its footer
+    // are wrong unless both requests carry the same filter, so pin that here.
+    const { body } = await get(server, '/');
+    expect(body).toContain('function filterParams()');
+    expect(body).toContain('fetch(stateUrl())');
+    expect(body).not.toContain("fetch('/__preview/state')");
+  });
+
+  it('escapes every part of a diagnostic, not only its message', async () => {
+    const { body } = await get(server, '/');
+    expect(body).toContain('.filter(Boolean).map(escapeHtml).join');
+  });
+
   it('serves project assets but refuses to escape the project', async () => {
     const asset = await get(server, '/assets/suits/denari.svg');
     expect(asset.status).toBe(200);

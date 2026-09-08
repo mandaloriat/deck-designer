@@ -84,7 +84,14 @@ export async function startPreviewServer(options: PreviewServerOptions): Promise
 
   async function handle(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     const url = new URL(req.url ?? '/', 'http://127.0.0.1');
-    const route = decodeURIComponent(url.pathname);
+    let route: string;
+    try {
+      route = decodeURIComponent(url.pathname);
+    } catch {
+      res.statusCode = 400;
+      res.end('malformed url');
+      return;
+    }
 
     if (route === '/' || route === '/index.html') return send(res, 'text/html; charset=utf-8', CHROME_PAGE);
     if (route === '/__preview/events') return subscribe(res);
@@ -119,6 +126,9 @@ export async function startPreviewServer(options: PreviewServerOptions): Promise
     }
 
     const shown = select(snapshot.cards, url);
+    const counts = new Map<string, number>();
+    for (const card of snapshot.cards) counts.set(card.type, (counts.get(card.type) ?? 0) + 1);
+
     send(
       res,
       MIME['.json'] as string,
@@ -129,7 +139,7 @@ export async function startPreviewServer(options: PreviewServerOptions): Promise
         cardTypes: snapshot.project.cardTypes.map((type) => ({
           id: type.id,
           name: type.name,
-          count: snapshot.cards.filter((card) => card.type === type.id).length,
+          count: counts.get(type.id) ?? 0,
         })),
         diagnostics: snapshot.diagnostics,
       }),
