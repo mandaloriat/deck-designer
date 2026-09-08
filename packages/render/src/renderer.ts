@@ -1,8 +1,12 @@
 import {
+  cardElement,
   collectCss,
   galleryBody,
   htmlDocument,
+  planAtlas,
   rasterFrame,
+  type AtlasOptions,
+  type AtlasPlan,
   type ComposedCard,
   type Diagnostic,
   type Project,
@@ -148,6 +152,75 @@ export class DeckRenderer {
     });
 
     return { images: results.flatMap((batch) => batch ?? []), diagnostics };
+  }
+
+  /**
+   * Renders a whole set of faces into one image: the grid a virtual tabletop
+   * expects. Cells are butted edge to edge with no gap, because the consumer
+   * slices the image by dividing it, not by finding seams.
+   */
+  async renderAtlas(
+    composed: readonly ComposedCard[],
+    options: AtlasOptions,
+  ): Promise<{ buffer: Buffer; plan: AtlasPlan; diagnostics: Diagnostic[] }> {
+    const first = composed[0];
+    if (!first) throw new Error('Nothing to lay out.');
+    const mismatch = composed.find(
+      (c) => c.geometry.width !== first.geometry.width || c.geometry.height !== first.geometry.height,
+    );
+    if (mismatch) {
+      throw new Error(
+        `An atlas holds one card size. "${mismatch.card.id}" is ` +
+          `${mismatch.geometry.width}x${mismatch.geometry.height}mm, expected ` +
+          `${first.geometry.width}x${first.geometry.height}mm. Select one component type.`,
+      );
+    }
+
+    const plan = planAtlas(first.geometry, composed.length, options);
+
+    const cells = composed
+      .map((item) => {
+        const card = cardElement({
+          id: item.card.id,
+          typeId: item.typeId,
+          face: item.face,
+          geometry: item.geometry,
+          html: item.html,
+          includeBleed: false,
+          rounded: false,
+          guides: false,
+        });
+        const frame = rasterFrame(item.geometry, false, plan.dpi);
+        return `<div class="dd-cell"><div class="dd-zoom" style="zoom:${frame.zoom}">${card}</div></div>`;
+      })
+      .join('');
+
+    const html = this.buildDocument({
+      body: `<div id="dd-atlas">${cells}</div>`,
+      typeIds: composed.map((c) => c.typeId),
+      pageCss: `body{margin:0}
+#dd-atlas{
+  display:grid;
+  grid-template-columns:repeat(${plan.columns}, ${plan.cardWidthPx}px);
+  grid-auto-rows:${plan.cardHeightPx}px;
+  width:${plan.widthPx}px;
+}
+.dd-cell{width:${plan.cardWidthPx}px;height:${plan.cardHeightPx}px;overflow:hidden}`,
+    });
+
+    const page = await this.context.newPage();
+    try {
+      const problems = await this.load(page, html);
+      const buffer = await page.locator('#dd-atlas').screenshot({
+        type: 'png',
+        omitBackground: this.project.render.background === 'transparent',
+        animations: 'disabled',
+        caret: 'hide',
+      });
+      return { buffer, plan, diagnostics: this.toDiagnostics(problems) };
+    } finally {
+      await page.close();
+    }
   }
 
   private buildDocument(input: { body: string; typeIds: readonly string[]; pageCss?: string }): string {

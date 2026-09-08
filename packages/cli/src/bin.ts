@@ -10,6 +10,7 @@ import { initCommand } from './commands/init.js';
 import { doctorCommand } from './commands/doctor.js';
 import { watchCommand } from './commands/watch.js';
 import { previewCommand } from './commands/preview.js';
+import { atlasCommand } from './commands/atlas.js';
 import { pageFormatNames } from './geometry.js';
 
 const VERSION = '0.1.0';
@@ -107,6 +108,18 @@ withRender(withSelection(program.command('export').description('render a selecti
   .option('--guides', 'draw bleed and safe-area guides')
   .action(async (options, command: Command) => {
     await run('export', command, (reporter) => exportCommand(options, reporter));
+  });
+
+withSelection(program.command('atlas').description('render the deck as one grid image for a virtual tabletop'))
+  .option('-o, --out <dir>', 'output directory (default: <output.dir>/atlas)')
+  .option('--columns <n>', 'force the grid width (max 10)', (v) => Number.parseInt(v, 10))
+  .option('--rows <n>', 'force the grid height (max 7)', (v) => Number.parseInt(v, 10))
+  .option('--max-size <px>', 'cap the longest side of the image', (v) => Number.parseInt(v, 10), 4096)
+  .option('--dpi <number>', 'cap the resolution', (v) => Number.parseInt(v, 10))
+  .option('--concurrency <number>', 'parallel render pages', (v) => Number.parseInt(v, 10))
+  .option('--allow-network', 'let the page make outbound requests (breaks reproducibility)')
+  .action(async (options, command: Command) => {
+    await run('atlas', command, (reporter) => atlasCommand(options, reporter));
   });
 
 withSelection(
