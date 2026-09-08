@@ -12,10 +12,15 @@ import {
   loadProject,
   rasterFrame,
   resolveCards,
+  resolveInProject,
+  resolveTheme,
+  ThemeWriteError,
+  writeVariable,
   type Card,
   type Diagnostic,
   type Face,
   type Project,
+  type ThemeVariable,
 } from '@deck-designer/core';
 import { CHROME_PAGE } from './page.js';
 
@@ -67,6 +72,7 @@ interface Snapshot {
  */
 export async function startPreviewServer(options: PreviewServerOptions): Promise<PreviewServer> {
   const clients = new Set<http.ServerResponse>();
+  const WRITABLE = isLoopback(options.host);
 
   const load = async (): Promise<Snapshot> => {
     const project = await loadProject({ cwd: options.root });
@@ -93,6 +99,12 @@ export async function startPreviewServer(options: PreviewServerOptions): Promise
       return;
     }
 
+    if (route === '/__preview/theme') return writeTheme(req, res);
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      res.statusCode = 405;
+      res.end('method not allowed');
+      return;
+    }
     if (route === '/' || route === '/index.html') return send(res, 'text/html; charset=utf-8', CHROME_PAGE);
     if (route === '/__preview/events') return subscribe(res);
     if (route === '/__preview/state') return sendState(res, url);
@@ -128,6 +140,7 @@ export async function startPreviewServer(options: PreviewServerOptions): Promise
     const shown = select(snapshot.cards, url);
     const counts = new Map<string, number>();
     for (const card of snapshot.cards) counts.set(card.type, (counts.get(card.type) ?? 0) + 1);
+    const theme = resolveTheme(snapshot.project);
 
     send(
       res,
@@ -141,9 +154,79 @@ export async function startPreviewServer(options: PreviewServerOptions): Promise
           name: type.name,
           count: counts.get(type.id) ?? 0,
         })),
-        diagnostics: snapshot.diagnostics,
+        theme: theme.variables,
+        themeWritable: WRITABLE,
+        diagnostics: [...snapshot.diagnostics, ...theme.diagnostics],
       }),
     );
+  }
+
+  /**
+   * Writes one custom property back into the stylesheet that declares it. The
+   * watcher picks the change up and reloads every client, so the file stays the
+   * source of truth: the panel edits the deck, it does not shadow it.
+   */
+  async function writeTheme(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+    if (req.method !== 'POST') return fail(res, 405, 'preview/method', 'Use POST to set a theme value.');
+    // A write endpoint is a different proposition from a read-only preview:
+    // anyone who can reach the port could edit the project. Reading it over the
+    // network is a choice `--host` already warns about; writing is not offered.
+    if (!WRITABLE) {
+      return fail(res, 403, 'preview/not-loopback', 'Theme editing is disabled when the preview is not bound to loopback.');
+    }
+    // Blocks the one cross-origin shape that would not be preflighted: a form
+    // POST cannot set this content type, and we send no CORS headers.
+    if (!/^application\/json\b/i.test(req.headers['content-type'] ?? '')) {
+      return fail(res, 415, 'preview/content-type', 'Theme writes must be application/json.');
+    }
+    // Whatever host the browser used to reach us is the only origin that may
+    // write; anything else is another site talking to a port it guessed.
+    const origin = req.headers.origin;
+    if (origin !== undefined && origin !== `http://${req.headers.host ?? ''}`) {
+      return fail(res, 403, 'preview/origin', `Refusing a theme write from ${origin}.`);
+    }
+
+    let payload: { name?: unknown; value?: unknown };
+    try {
+      payload = JSON.parse(await readBody(req)) as typeof payload;
+    } catch (error) {
+      return fail(res, 400, 'preview/bad-request', error instanceof Error ? error.message : String(error));
+    }
+    const name = typeof payload.name === 'string' ? payload.name : '';
+    const value = typeof payload.value === 'string' ? payload.value : '';
+    if (!name) return fail(res, 400, 'preview/bad-request', 'A theme write needs a variable name.');
+
+    let snapshot: Snapshot;
+    try {
+      snapshot = await load();
+    } catch (error) {
+      const described = describe(error);
+      return fail(res, 409, described.code, described.message);
+    }
+
+    // Only a knob the project declares can be written. The name never reaches
+    // the filesystem, and an undeclared property cannot be introduced from here.
+    const variable = resolveTheme(snapshot.project).variables.find((v: ThemeVariable) => v.name === name);
+    if (!variable) return fail(res, 404, 'theme/not-declared', `${name} is not one of this deck's theme variables.`);
+
+    const file = resolveInProject(snapshot.project.root, variable.file);
+    try {
+      const before = await fsp.readFile(file, 'utf8');
+      const after = writeVariable(before, name, value);
+      if (after !== before) await fsp.writeFile(file, after);
+    } catch (error) {
+      const code = error instanceof ThemeWriteError ? error.code : 'theme/write-failed';
+      const status = error instanceof ThemeWriteError ? 400 : 500;
+      return fail(res, status, code, error instanceof Error ? error.message : String(error));
+    }
+
+    res.statusCode = 200;
+    send(res, MIME['.json'] as string, JSON.stringify({ name, value: value.trim(), file: variable.file }));
+  }
+
+  function fail(res: http.ServerResponse, status: number, code: string, message: string): void {
+    res.statusCode = status;
+    send(res, MIME['.json'] as string, JSON.stringify({ error: { code, message } }));
   }
 
   async function sendGallery(res: http.ServerResponse, url: URL): Promise<void> {
@@ -254,6 +337,25 @@ export async function startPreviewServer(options: PreviewServerOptions): Promise
         server.close(() => resolve());
       }),
   };
+}
+
+/** Only a preview nobody else can reach is allowed to write to the project. */
+function isLoopback(host: string): boolean {
+  return host === '127.0.0.1' || host === 'localhost' || host === '::1' || host === '[::1]';
+}
+
+/** Small on purpose: a theme write is a name and a CSS value, never a file. */
+const MAX_BODY = 8 * 1024;
+
+async function readBody(req: http.IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += (chunk as Buffer).length;
+    if (size > MAX_BODY) throw new Error('Request body too large.');
+    chunks.push(chunk as Buffer);
+  }
+  return Buffer.concat(chunks).toString('utf8');
 }
 
 function select(cards: readonly Card[], url: URL): Card[] {

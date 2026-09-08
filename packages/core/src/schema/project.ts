@@ -27,6 +27,27 @@ export const fontSchema = z.object({
   display: z.enum(['auto', 'block', 'swap', 'fallback', 'optional']).optional(),
 });
 
+/**
+ * A CSS custom property the deck offers as a knob. Declared by name; the
+ * control to show is inferred from the value the stylesheet currently holds,
+ * so the stylesheet stays the source of truth and the config stays a list.
+ */
+export const themeEntrySchema = z
+  .union([
+    z.string(),
+    z.object({
+      name: z.string(),
+      label: z.string().optional(),
+      /** Turns a length or number into a slider. Both are required for one. */
+      min: z.number().optional(),
+      max: z.number().optional(),
+    }),
+  ])
+  .transform((entry) => (typeof entry === 'string' ? { name: entry } : entry))
+  .refine((entry) => /^--[A-Za-z0-9][A-Za-z0-9_-]*$/.test(entry.name), {
+    message: 'must be a CSS custom property, e.g. --card-ink',
+  });
+
 export const cardTypeSchema = z.object({
   id: idSchema,
   name: z.string().optional(),
@@ -69,6 +90,8 @@ export const projectSchema = z.object({
   fonts: z.array(fontSchema).default([]),
   /** CSS applied to every card type, before the card type's own styles. */
   styles: z.array(z.string()).default([]),
+  /** Custom properties the preview exposes as editable controls. */
+  theme: z.array(themeEntrySchema).default([]),
   /** `[[token]]` in rich text resolves to `<dir>/<token>.<ext>` when the file exists. */
   icons: z
     .object({
@@ -83,3 +106,4 @@ export const projectSchema = z.object({
 export type ProjectConfig = z.infer<typeof projectSchema>;
 export type CardTypeConfig = z.infer<typeof cardTypeSchema>;
 export type FontConfig = z.infer<typeof fontSchema>;
+export type ThemeEntry = z.infer<typeof themeEntrySchema>;

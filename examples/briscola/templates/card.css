@@ -11,7 +11,7 @@
 /* A double rule, the outer one in the suit colour. */
 .frame {
   position: absolute;
-  inset: calc(var(--dd-bleed) + 3mm);
+  inset: calc(var(--dd-bleed) + var(--frame-inset));
   border: 0.5mm solid var(--accent);
   border-radius: 1.5mm;
 }

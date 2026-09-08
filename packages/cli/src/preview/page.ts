@@ -49,7 +49,7 @@ export const CHROME_PAGE = `<!doctype html>
   .group > label { color: var(--muted); }
   .spacer { flex: 1; }
 
-  button, select, input[type=search] {
+  button, select, input[type=search], input[type=text], input[type=number] {
     font: inherit;
     color: var(--text);
     background: var(--bar-2);
@@ -61,13 +61,36 @@ export const CHROME_PAGE = `<!doctype html>
   button:hover { border-color: #3d434e; }
   button.on { background: var(--accent); border-color: var(--accent); color: #0f1115; }
   input[type=search] { min-width: 160px; }
+  input:disabled { opacity: 0.5; }
   .zoom { min-width: 52px; text-align: center; font-variant-numeric: tabular-nums; }
 
   .toggle { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); cursor: pointer; }
   .toggle input { accent-color: var(--accent); }
 
-  main { position: relative; overflow: hidden; }
+  main { position: relative; overflow: hidden; display: grid; grid-template-columns: 1fr auto; }
   iframe { width: 100%; height: 100%; border: 0; display: block; background: var(--canvas); }
+
+  #theme {
+    width: 280px;
+    overflow: auto;
+    padding: 10px 12px 16px;
+    background: var(--bar);
+    border-left: 1px solid var(--line);
+  }
+  #theme[hidden] { display: none; }
+  #theme h2 { margin: 4px 0 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+  #theme .note { color: var(--warn); margin-bottom: 10px; }
+  .knob { margin-bottom: 12px; }
+  .knob > label { display: block; margin-bottom: 4px; }
+  .knob .row { display: flex; align-items: center; gap: 6px; }
+  .knob .row input[type=text] { flex: 1; min-width: 0; font: 12px ui-monospace, Menlo, monospace; }
+  .knob .row input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent); }
+  .knob input[type=color] { width: 30px; height: 26px; padding: 1px; background: var(--bar-2); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+  .knob .chip { width: 30px; height: 26px; border: 1px solid var(--line); border-radius: 6px; flex: none; }
+  .knob .num { min-width: 68px; text-align: right; color: var(--muted); font: 12px ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
+  .knob .src { color: var(--muted); font-size: 11px; margin-top: 3px; font-family: ui-monospace, Menlo, monospace; }
+  .knob .bad { color: var(--error); font-size: 11px; margin-top: 3px; }
+  .knob[hidden] { display: none; }
 
   #diagnostics {
     max-height: 34vh;
@@ -132,10 +155,14 @@ export const CHROME_PAGE = `<!doctype html>
   <input type="search" id="search" placeholder="Filter by id" />
 
   <div class="spacer"></div>
+  <button id="toggle-theme" hidden>Theme</button>
   <button id="toggle-diagnostics">Diagnostics</button>
 </header>
 
-<main><iframe id="stage" title="deck"></iframe></main>
+<main>
+  <iframe id="stage" title="deck"></iframe>
+  <aside id="theme" hidden><h2>Theme</h2><div id="knobs"></div></aside>
+</main>
 
 <div id="diagnostics" hidden></div>
 
@@ -158,6 +185,7 @@ export const CHROME_PAGE = `<!doctype html>
     guides: false,
     rounded: false,
     search: '',
+    themePanel: false,
   };
   var STORAGE = 'deck-preview-controls';
   try {
@@ -227,6 +255,177 @@ export const CHROME_PAGE = `<!doctype html>
     });
   }
 
+
+  /**
+   * Uncommitted knob values. The stylesheet is the source of truth, so these
+   * exist only between a drag and the write that persists it, and are reapplied
+   * if the frame happens to reload in that window.
+   */
+  var overrides = {};
+  var themeSignature = '';
+
+  function applyLive(name, value) {
+    try {
+      stage.contentDocument.documentElement.style.setProperty(name, value);
+    } catch (e) { /* the frame is mid-navigation; the load handler will catch up */ }
+  }
+
+  stage.addEventListener('load', function () {
+    for (var name in overrides) applyLive(name, overrides[name]);
+  });
+
+  /** A native colour input speaks hex and nothing else. */
+  function hexOf(value) {
+    var v = String(value == null ? '' : value).trim();
+    if (/^#[0-9a-f]{6}$/i.test(v)) return v.toLowerCase();
+    if (/^#[0-9a-f]{3}$/i.test(v)) return ('#' + v[1] + v[1] + v[2] + v[2] + v[3] + v[3]).toLowerCase();
+    return null;
+  }
+
+  /** Enough resolution to drag a corner radius, without pretending to nanometres. */
+  function stepFor(min, max) {
+    var span = Math.abs(max - min);
+    return span <= 2 ? 0.01 : span <= 50 ? 0.1 : 1;
+  }
+
+  function knob(v, writable) {
+    var wrap = document.createElement('div');
+    wrap.className = 'knob';
+    var label = document.createElement('label');
+    label.textContent = v.label;
+    wrap.appendChild(label);
+
+    var row = document.createElement('div');
+    row.className = 'row';
+    wrap.appendChild(row);
+
+    var bad = document.createElement('div');
+    bad.className = 'bad';
+    bad.hidden = true;
+
+    var current = overrides[v.name] !== undefined ? overrides[v.name] : v.value;
+
+    function set(value, commit) {
+      overrides[v.name] = value;
+      applyLive(v.name, value);
+      if (!commit || !writable) return;
+      bad.hidden = true;
+      fetch('/__preview/theme', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: v.name, value: value })
+      }).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, data: d }; });
+      }).then(function (out) {
+        // The write triggers the watcher, which reloads the frame with the
+        // value the file now holds; nothing local needs to survive that.
+        if (out.ok) { delete overrides[v.name]; return; }
+        bad.hidden = false;
+        bad.textContent = out.data && out.data.error ? out.data.error.message : 'The write failed.';
+      }).catch(function () {
+        bad.hidden = false;
+        bad.textContent = 'The preview server did not answer.';
+      });
+    }
+
+    if (v.kind === 'color') {
+      var text = document.createElement('input');
+      text.type = 'text';
+      text.value = current;
+      text.disabled = !writable;
+      var hex = hexOf(current);
+      if (hex) {
+        var picker = document.createElement('input');
+        picker.type = 'color';
+        picker.value = hex;
+        picker.disabled = !writable;
+        picker.oninput = function () { text.value = picker.value; set(picker.value, false); };
+        picker.onchange = function () { text.value = picker.value; set(picker.value, true); };
+        text.oninput = function () {
+          var h = hexOf(text.value);
+          if (h) picker.value = h;
+          set(text.value, false);
+        };
+        row.appendChild(picker);
+      } else {
+        // oklch(), colour functions, keywords: the browser paints them even
+        // though the picker cannot parse them, so show a swatch instead.
+        var chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.style.background = current;
+        text.oninput = function () { chip.style.background = text.value; set(text.value, false); };
+        row.appendChild(chip);
+      }
+      text.onchange = function () { set(text.value, true); };
+      row.appendChild(text);
+    } else if (v.kind === 'length' || v.kind === 'number') {
+      var unit = v.unit || '';
+      var readout = document.createElement('span');
+      readout.className = 'num';
+      var numeric = document.createElement('input');
+      if (v.min !== undefined && v.max !== undefined) {
+        numeric.type = 'range';
+        numeric.min = String(v.min);
+        numeric.max = String(v.max);
+        numeric.step = String(stepFor(v.min, v.max));
+      } else {
+        numeric.type = 'number';
+        numeric.step = 'any';
+      }
+      numeric.value = String(parseFloat(current));
+      numeric.disabled = !writable;
+      readout.textContent = numeric.value + unit;
+      var push = function (commit) {
+        // A cleared number field is not an instruction to write "mm".
+        if (numeric.value === '') return;
+        readout.textContent = numeric.value + unit;
+        set(numeric.value + unit, commit);
+      };
+      numeric.oninput = function () { push(false); };
+      numeric.onchange = function () { push(true); };
+      row.appendChild(numeric);
+      row.appendChild(readout);
+    } else {
+      var free = document.createElement('input');
+      free.type = 'text';
+      free.value = current;
+      free.disabled = !writable;
+      free.oninput = function () { set(free.value, false); };
+      free.onchange = function () { set(free.value, true); };
+      row.appendChild(free);
+    }
+
+    var src = document.createElement('div');
+    src.className = 'src';
+    src.textContent = v.name + ' · ' + v.file;
+    wrap.appendChild(src);
+    wrap.appendChild(bad);
+    return wrap;
+  }
+
+  function renderTheme(variables, writable) {
+    // Rebuilding on every poll would fight the hand on the slider, so the panel
+    // is only rewritten when the declared knobs or their stored values move.
+    var signature = JSON.stringify(variables) + '|' + writable;
+    if (signature === themeSignature) return;
+    themeSignature = signature;
+
+    el('toggle-theme').hidden = variables.length === 0;
+    el('theme').hidden = variables.length === 0 || !state.themePanel;
+    el('toggle-theme').classList.toggle('on', !el('theme').hidden);
+    if (!variables.length) return;
+
+    var box = el('knobs');
+    box.innerHTML = '';
+    if (!writable) {
+      var note = document.createElement('div');
+      note.className = 'note';
+      note.textContent = 'Read-only: writing needs a preview bound to loopback.';
+      box.appendChild(note);
+    }
+    variables.forEach(function (v) { box.appendChild(knob(v, writable)); });
+  }
+
   function loadState() {
     fetch(stateUrl()).then(function (r) { return r.json(); }).then(function (data) {
       el('project').textContent = data.error ? '' : ' \\u00b7 ' + data.project;
@@ -246,6 +445,7 @@ export const CHROME_PAGE = `<!doctype html>
       el('badges').innerHTML =
         (errors ? '<span class="pill error">' + errors + ' error</span> ' : '') +
         (warnings ? '<span class="pill warn">' + warnings + ' warning</span>' : '');
+      renderTheme(data.theme || [], data.themeWritable !== false);
       renderDiagnostics(data.error ? [{ severity: 'error', code: data.error.code, message: data.error.message }] : (data.diagnostics || []));
       if (errors || data.error) el('diagnostics').hidden = false;
       el('updated').textContent = 'updated ' + new Date().toLocaleTimeString();
@@ -264,6 +464,13 @@ export const CHROME_PAGE = `<!doctype html>
     clearTimeout(searchTimer);
     var value = e.target.value.trim();
     searchTimer = setTimeout(function () { state.search = value; refresh(); }, 200);
+  };
+  el('toggle-theme').onclick = function () {
+    var box = el('theme');
+    box.hidden = !box.hidden;
+    this.classList.toggle('on', !box.hidden);
+    state.themePanel = !box.hidden;
+    persist();
   };
   el('toggle-diagnostics').onclick = function () {
     var box = el('diagnostics');

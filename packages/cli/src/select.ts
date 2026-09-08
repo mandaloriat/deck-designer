@@ -2,6 +2,7 @@ import {
   composeCards,
   loadProject,
   resolveCards,
+  resolveTheme,
   type Card,
   type ComposedCard,
   type Diagnostic,
@@ -30,7 +31,14 @@ export async function prepare(options: SelectionOptions, checkAssets = true): Pr
     checkAssets,
     ...(options.type?.length ? { types: options.type } : {}),
   });
-  return { project, cards: filterCards(cards, options), diagnostics };
+  // Theme knobs are checked here rather than only in the preview: a typo in
+  // `theme:` should fail `deck validate` in CI, not wait to be noticed as a
+  // control that never appeared.
+  return {
+    project,
+    cards: filterCards(cards, options),
+    diagnostics: [...diagnostics, ...resolveTheme(project).diagnostics],
+  };
 }
 
 export function filterCards(cards: readonly Card[], options: SelectionOptions): Card[] {
