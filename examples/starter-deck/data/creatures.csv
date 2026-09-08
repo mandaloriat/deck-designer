@@ -1,0 +1,5 @@
+name,cost,faction,attack,health,rules,flavour
+Dawn Sentinel,2,order,2,3,"**Guard.** While this is on the field, adjacent allies take 1 less damage.",They stand so others need not.
+Ember Whelp,1,chaos,2,1,"When this enters play, deal [[attack]] 1 damage to any target.",
+Thicket Warden,4,wild,3,6,"**Rooted.** Cannot be moved. Heals [[health]] 1 at the start of your turn.",Older than the road beside it.
+Tidecaller,3,order,1,4,"Draw a card when an ally leaves play.",

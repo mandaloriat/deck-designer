@@ -1,0 +1,23 @@
+<div class="frame" data-faction="{{ card.faction }}">
+  <div class="bg"></div>
+  <header class="title">
+    <span class="name" data-autofit data-autofit-max="4.6mm" data-autofit-min="2.6mm">{{ card.name }}</span>
+    <span class="cost">{{ card.raw.cost }}</span>
+  </header>
+
+  <div class="art">
+    {% if card.art %}<img src="{{ card.art }}" alt="" />{% endif %}
+  </div>
+
+  <div class="typeline">{{ type.name }} &middot; {{ card.faction }}</div>
+
+  <div class="rules" data-autofit data-autofit-max="3mm" data-autofit-min="1.9mm">
+    {{ card.rules }}
+    {% if card.flavour %}<span class="flavour">{{ card.flavour }}</span>{% endif %}
+  </div>
+
+  <div class="stats">
+    <span class="stat">{% if icons.attack %}<img class="dd-icon" src="{{ icons.attack }}" alt="attack" />{% endif %}{{ card.raw.attack }}</span>
+    <span class="stat">{% if icons.health %}<img class="dd-icon" src="{{ icons.health }}" alt="health" />{% endif %}{{ card.raw.health }}</span>
+  </div>
+</div>

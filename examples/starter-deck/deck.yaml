@@ -1,0 +1,63 @@
+version: 1
+name: Starter Deck
+description: A minimal deck-designer project. Edit and re-run `deck build`.
+units: mm
+
+card:
+  width: 63
+  height: 88
+  bleed: 3
+  safe: 4
+  cornerRadius: 3
+
+render:
+  dpi: 300
+  background: transparent
+
+styles:
+  - templates/base.css
+
+icons:
+  dir: assets/icons
+
+profiles:
+  # Home printing: cards tiled edge to edge, cut on the crop marks.
+  print:
+    kind: sheet
+    page: A4
+    margin: 10
+    gutter: 0
+    bleed: false
+    marks: true
+    duplex: long-edge
+  # Professional printing:each card cut individually, so bleeds need room.
+  print-bleed:
+    kind: sheet
+    page: A4
+    margin: 10
+    gutter: 6
+    bleed: true
+    marks: true
+    duplex: long-edge
+  proofs:
+    kind: single
+    bleed: false
+    backs: interleave
+
+cardTypes:
+  - id: creature
+    name: Creature
+    template: templates/creature.liquid
+    back: templates/back.liquid
+    styles:
+      - templates/creature.css
+    data: data/creatures.csv
+    fields:
+      name: { type: text, required: true, maxLength: 28 }
+      cost: { type: integer, min: 0, max: 20, default: 0 }
+      faction: { type: enum, values: [order, chaos, wild], default: order }
+      attack: { type: integer, min: 0, default: 0 }
+      health: { type: integer, min: 0, default: 1 }
+      rules: { type: richtext }
+      flavour: { type: text }
+      art: { type: image }

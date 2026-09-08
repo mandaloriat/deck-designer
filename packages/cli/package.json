@@ -1,0 +1,26 @@
+{
+  "name": "@deck-designer/cli",
+  "version": "0.1.0",
+  "description": "The `deck` command: validate, build and export card decks headlessly.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mandaloriat/deck-designer.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/mandaloriat/deck-designer#readme",
+  "type": "module",
+  "license": "Apache-2.0",
+  "bin": {
+    "deck": "./dist/bin.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@deck-designer/core": "workspace:*",
+    "@deck-designer/render": "workspace:*",
+    "commander": "^12.1.0"
+  }
+}

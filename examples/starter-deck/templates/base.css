@@ -1,0 +1,26 @@
+/*
+ * Deck-wide styles. The engine only defines the card box and the
+ * --dd-* geometry variables; everything visual lives here.
+ */
+:root {
+  --ink: #14171c;
+  --paper: #f4f1ea;
+  --order: #2f5f8f;
+  --chaos: #8f2f3f;
+  --wild: #3f7a45;
+}
+
+.dd-card {
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  color: var(--ink);
+  --dd-card-background: var(--paper);
+}
+
+.frame {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  padding: 3mm;
+  gap: 1.5mm;
+}

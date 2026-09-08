@@ -1,0 +1,22 @@
+<div class="back">
+  <div class="back-mark">{{ deck.name }}</div>
+</div>
+<style>
+  .back {
+    position: absolute;
+    inset: calc(-1 * var(--dd-bleed));
+    display: grid;
+    place-items: center;
+    background:
+      repeating-linear-gradient(45deg, #1d2733 0 2mm, #223041 2mm 4mm);
+    color: #e8e2d2;
+  }
+  .back-mark {
+    font-size: 4mm;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    border: 0.4mm solid currentColor;
+    padding: 2mm 3mm;
+    border-radius: 1mm;
+  }
+</style>

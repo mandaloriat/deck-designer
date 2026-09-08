@@ -1,0 +1,96 @@
+.frame { --accent: var(--order); }
+.frame[data-faction='chaos'] { --accent: var(--chaos); }
+.frame[data-faction='wild'] { --accent: var(--wild); }
+
+.bg {
+  position: absolute;
+  inset: calc(-1 * var(--dd-bleed));
+  background:
+    radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%),
+    var(--paper);
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 1.5mm;
+  font-size: 4.2mm;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.title .name {
+  flex: 1;
+  min-width: 0;
+  height: 6mm;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+.cost {
+  flex: none;
+  width: 7mm;
+  height: 7mm;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 4mm;
+  font-weight: 700;
+}
+
+.art {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1mm;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 35%, #fff), color-mix(in srgb, var(--accent) 5%, #fff));
+  box-shadow: inset 0 0 0 0.3mm color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* .bg is positioned, so in-flow siblings need a stacking context to sit above it. */
+.bg { z-index: 0; }
+.frame > :not(.bg):not(.stats) { position: relative; z-index: 1; }
+.art img { width: 100%; height: 100%; object-fit: cover; }
+
+.typeline {
+  font-size: 2.8mm;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--ink) 65%, transparent);
+}
+
+.rules {
+  height: 20mm;
+  overflow: hidden;
+  font-size: 3mm;
+  line-height: 1.25;
+}
+.rules .flavour {
+  display: block;
+  margin-top: 1mm;
+  font-style: italic;
+  color: color-mix(in srgb, var(--ink) 60%, transparent);
+}
+
+.stats {
+  position: absolute;
+  right: 3mm;
+  bottom: 3mm;
+  z-index: 2;
+  display: flex;
+  gap: 1mm;
+  font-size: 3.4mm;
+  font-weight: 700;
+}
+.stat {
+  min-width: 7mm;
+  padding: 0.6mm 1.2mm;
+  border-radius: 1mm;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8mm;
+}
+.stat .dd-icon { filter: brightness(0) invert(1); }

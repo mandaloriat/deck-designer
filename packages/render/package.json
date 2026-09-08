@@ -1,0 +1,28 @@
+{
+  "name": "@deck-designer/render",
+  "version": "0.1.0",
+  "description": "Chromium-backed PNG and vector PDF renderer for deck-designer.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mandaloriat/deck-designer.git",
+    "directory": "packages/render"
+  },
+  "homepage": "https://github.com/mandaloriat/deck-designer#readme",
+  "type": "module",
+  "license": "Apache-2.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@deck-designer/core": "workspace:*",
+    "playwright-core": "1.56.1"
+  }
+}
