@@ -1,4 +1,8 @@
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { DeckError } from '../src/util/errors.js';
 import { loadProject } from '../src/project/load.js';
 import { resolveCards } from '../src/data/resolve.js';
 import { makeProject } from './helpers.js';
@@ -125,4 +129,40 @@ describe('directory sources', () => {
   it('reports an empty directory rather than rendering nothing', async () => {
     await expect(load({ 'data/units/readme.txt': 'nope' })).rejects.toThrow(/No data files/);
   });
+});
+
+describe('data source validation', () => {
+  it('rejects a body field that is not rich text, at config time', async () => {
+    const config = CONFIG.replace('    data: data/units\n', '    data: data/units\n    body: cost\n');
+    // Otherwise the prose lands in an integer field and every row reports
+    // "not a number", pointing at the data instead of the mistake.
+    await expect(load({ 'data/units/a.md': '---\nname: A\n---\nBody.\n' }, config)).rejects.toThrow(
+      /is a integer field/,
+    );
+  });
+
+  it('rejects a body field that does not exist', async () => {
+    const config = CONFIG.replace('    data: data/units\n', '    data: data/units\n    body: nope\n');
+    await expect(load({ 'data/units/a.md': '---\nname: A\n---\n' }, config)).rejects.toThrow(/not a field/);
+  });
+
+  it.skipIf(process.platform === 'win32')(
+    'wraps a data source that is neither a file nor a directory',
+    async () => {
+      const fixture = await makeProject({
+        'deck.yaml': CONFIG,
+        'templates/unit.liquid': TEMPLATE,
+        'data/placeholder.md': '---\nname: A\n---\n',
+      });
+      try {
+        // readdir on a FIFO throws a bare ENOTDIR; the loader owes the user a code.
+        await promisify(execFile)('mkfifo', [path.join(fixture.root, 'data', 'units')]);
+        const error = await loadProject({ cwd: fixture.root }).catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(DeckError);
+        expect((error as DeckError).code).toBe('data/not-a-data-source');
+      } finally {
+        await fixture.cleanup();
+      }
+    },
+  );
 });

@@ -30,8 +30,22 @@ export async function expandDataSource(absPath: string): Promise<string[]> {
     throw new DeckError(`No such data source: ${absPath}`, { code: 'data/missing-file', cause });
   }
   if (stat.isFile()) return [absPath];
+  if (!stat.isDirectory()) {
+    throw new DeckError(`Data source is neither a file nor a directory: ${absPath}`, {
+      code: 'data/not-a-data-source',
+    });
+  }
 
-  const entries = await fs.readdir(absPath, { withFileTypes: true });
+  let entries;
+  try {
+    entries = await fs.readdir(absPath, { withFileTypes: true });
+  } catch (cause) {
+    throw new DeckError(`Cannot read data directory ${absPath}: ${(cause as Error).message}`, {
+      code: 'data/unreadable-directory',
+      cause,
+    });
+  }
+
   const files = entries
     .filter((entry) => entry.isFile())
     .map((entry) => entry.name)

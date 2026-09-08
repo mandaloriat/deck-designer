@@ -214,12 +214,24 @@ export async function loadProject(options: LoadOptions = {}): Promise<Project> {
     const dataPaths: string[] = [];
     for (const rel of sources) dataPaths.push(...(await expandDataSource(resolveInProject(root, rel))));
 
-    const bodyField = raw.body ?? soleRichTextField(raw.fields);
-    if (raw.body !== undefined && raw.fields[raw.body] === undefined) {
-      throw new DeckError(`Card type "${raw.id}" declares body: ${raw.body}, which is not a field.`, {
-        code: 'config/unknown-body-field',
-      });
+    if (raw.body !== undefined) {
+      const target = raw.fields[raw.body];
+      if (target === undefined) {
+        throw new DeckError(`Card type "${raw.id}" declares body: ${raw.body}, which is not a field.`, {
+          code: 'config/unknown-body-field',
+        });
+      }
+      // A body is prose. Letting it land in a number or enum field turns a
+      // config mistake into a per-row coercion error pointing at the data.
+      if (target.type !== 'richtext') {
+        throw new DeckError(
+          `Card type "${raw.id}" declares body: ${raw.body}, which is a ${target.type} field. ` +
+            'A body needs a richtext field.',
+          { code: 'config/bad-body-field' },
+        );
+      }
     }
+    const bodyField = raw.body ?? soleRichTextField(raw.fields);
 
     cardTypes.push({
       id: raw.id,

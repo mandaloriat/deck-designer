@@ -152,7 +152,9 @@ Heals [[health]] 1 at the start of your turn.
 ```
 
 The body fills the field named by `body:` on the component type, or, if that is
-omitted, the type's only `richtext` field. Setting the same field in both places
+omitted, the type's only `richtext` field. `body:` has to name a `richtext`
+field; pointing it at a number or an enum is a config error rather than a pile
+of coercion failures on every row. Setting the same field in both places
 is a warning and the body wins. The body is rich text, not full Markdown: bold,
 italics, line breaks, `[[icon]]` tokens and the inline tag allowlist, nothing
 else. Give the field `paragraphs: true` to turn blank-line separated blocks into
