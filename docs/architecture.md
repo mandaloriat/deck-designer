@@ -50,6 +50,12 @@ Determinism comes from: blocking every request that does not target that server,
 requiring fonts to be vendored, and pinning colour profile, locale, timezone,
 reduced motion and font hinting on the browser context.
 
+Blocking page requests is only half of it. The browser process has its own
+network life — variations seeds, component and safe-browsing updates, sign-in
+probes — and none of it passes through request interception. Those are turned
+off at launch instead, which is the difference between a build that looks
+hermetic and one that is.
+
 Components are laid out as a contact sheet and screenshotted one element at a
 time, so a batch costs one page load. Each sits inside a capture box whose size
 in CSS pixels is exactly the target pixel size, with the component zoomed to fill

@@ -84,6 +84,15 @@ lines up, and emits a runnable script.
 Nothing is coupled: the plan is also written as `plan.json` if you would rather
 drive something else with it.
 
+## Examples
+
+`examples/starter-deck` is what `deck init` writes: a card type and a token
+type, to show that a component is only a size, a template and some rows.
+
+`examples/briscola` is a complete 40-card Italian deck with original artwork,
+built to put weight on the tool rather than to demonstrate it. Loops, masks,
+a vendored font, two render batches, ten print sheets.
+
 ## A project
 
     deck.yaml            component sizes, fields, fonts

@@ -1,0 +1,43 @@
+<div class="back">
+  <div class="lattice"></div>
+  <div class="roundel">
+    {%- assign suits = 'denari,coppe,spade,bastoni' | split: ',' -%}
+    {%- for suit in suits -%}
+      <span class="quarter mark" style="--mark: url('{{ 'assets/suits/' | append: suit | append: '.svg' | asset }}')"></span>
+    {%- endfor -%}
+  </div>
+</div>
+
+<style>
+  .back {
+    position: absolute;
+    inset: calc(-1 * var(--dd-bleed));
+    background: #1b2a38;
+    overflow: hidden;
+  }
+  /* A woven ground, built from gradients so it costs no assets. */
+  .lattice {
+    position: absolute;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(45deg, rgba(244, 239, 225, 0.09) 0 0.5mm, transparent 0.5mm 3mm),
+      repeating-linear-gradient(-45deg, rgba(244, 239, 225, 0.09) 0 0.5mm, transparent 0.5mm 3mm);
+  }
+  .roundel {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 30mm;
+    height: 30mm;
+    transform: translate(-50%, -50%);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    place-items: center;
+    gap: 2mm;
+    padding: 4mm;
+    border-radius: 50%;
+    background: #16222d;
+    box-shadow: 0 0 0 0.5mm #c8a24a, 0 0 0 1.4mm #16222d, 0 0 0 1.7mm rgba(200, 162, 74, 0.5);
+  }
+  .roundel .mark { width: 8mm; height: 8mm; --tint: #c8a24a; }
+</style>

@@ -1,0 +1,39 @@
+version: 1
+name: Briscola
+description: A 40-card Italian deck, reduced to geometry. Original artwork.
+units: mm
+
+card:
+  width: 58
+  height: 88
+  bleed: 3
+  safe: 4
+  cornerRadius: 3.5
+
+render:
+  dpi: 300
+  background: transparent
+
+fonts:
+  - family: EB Garamond
+    src: fonts/EBGaramond-Latin.woff2
+    weight: 400 700
+
+styles:
+  - templates/base.css
+
+cardTypes:
+  - id: card
+    name: Carta
+    template: templates/card.liquid
+    back: templates/back.liquid
+    styles:
+      - templates/card.css
+    data: data/deck.csv
+    fields:
+      suit: { type: enum, values: [denari, coppe, spade, bastoni], required: true }
+      rank: { type: integer, min: 1, max: 10, required: true }
+      # Briscola scoring. Zero for the cards that take no points.
+      points: { type: integer, min: 0, max: 11, default: 0 }
+      # Only the court cards have one; the field is checked against the files.
+      figure: { type: image, base: assets/figures }

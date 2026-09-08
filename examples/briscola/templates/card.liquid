@@ -1,0 +1,39 @@
+{%- assign suit_mark = 'assets/suits/' | append: card.suit | append: '.svg' | asset -%}
+{%- case card.raw.rank -%}
+  {%- when 1 -%}{%- assign label = 'A' -%}
+  {%- when 8 -%}{%- assign label = 'F' -%}
+  {%- when 9 -%}{%- assign label = 'C' -%}
+  {%- when 10 -%}{%- assign label = 'R' -%}
+  {%- else -%}{%- assign label = card.raw.rank -%}
+{%- endcase -%}
+
+<div class="face" data-suit="{{ card.suit }}" data-rank="{{ card.raw.rank }}">
+  <div class="frame"></div>
+
+  <div class="index index-tl">
+    <span class="rank">{{ label }}</span>
+    <span class="mark" style="--mark: url('{{ suit_mark }}')"></span>
+  </div>
+  <div class="index index-br">
+    <span class="rank">{{ label }}</span>
+    <span class="mark" style="--mark: url('{{ suit_mark }}')"></span>
+  </div>
+
+  {% if card.figure %}
+    <div class="court">
+      <span class="ornament mark" style="--mark: url('{{ card.figure }}')"></span>
+      <span class="initial">{{ label }}</span>
+      <span class="suit mark" style="--mark: url('{{ suit_mark }}')"></span>
+    </div>
+  {% else %}
+    <div class="pips">
+      {%- for pip in (1..card.raw.rank) -%}
+        <span class="pip mark" style="--mark: url('{{ suit_mark }}')"></span>
+      {%- endfor -%}
+    </div>
+  {% endif %}
+
+  {% if card.raw.points > 0 %}
+    <div class="points">{{ card.raw.points }} punti</div>
+  {% endif %}
+</div>

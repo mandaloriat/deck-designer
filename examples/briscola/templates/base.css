@@ -1,0 +1,26 @@
+/*
+ * Shared by both faces. The suit accents are the only thing that changes
+ * between the four suits; everything else is one deck.
+ */
+:root {
+  --ink: #1b1a17;
+  --paper: #f4efe1;
+  --denari: #a8762a;
+  --coppe: #97292f;
+  --spade: #2c4a76;
+  --bastoni: #35633f;
+}
+
+.dd-card {
+  font-family: 'EB Garamond', Georgia, serif;
+  color: var(--ink);
+  --dd-card-background: var(--paper);
+}
+
+/* Every symbol is a mask, so one SVG serves all four accents. */
+.mark {
+  display: block;
+  background: var(--tint, currentColor);
+  -webkit-mask: var(--mark) center / contain no-repeat;
+  mask: var(--mark) center / contain no-repeat;
+}
