@@ -81,4 +81,33 @@ describe.skipIf(!chromiumAvailable)('print-plan', () => {
     expect(script).toContain('cd "$(dirname "$0")"');
     expect(script).not.toMatch(/--image \d+,\d+,\//);
   });
+
+  it('warns when the tool it tells you to run is not installed', async () => {
+    const result = await printPlanCommand(
+      {
+        project: EXAMPLE,
+        out: path.join(out, 'print-missing'),
+        images: path.join(out, 'cards'),
+        page: 'A4',
+        command: 'definitely-not-installed-anywhere',
+      },
+      reporter,
+    );
+    expect(result.diagnostics?.some((d) => d.code === 'print/command-missing')).toBe(true);
+  });
+
+  it('stays quiet when the command resolves', async () => {
+    const result = await printPlanCommand(
+      // `sh` is on PATH wherever this suite can run at all.
+      {
+        project: EXAMPLE,
+        out: path.join(out, 'print-sh'),
+        images: path.join(out, 'cards'),
+        page: 'A4',
+        command: 'sh',
+      },
+      reporter,
+    );
+    expect(result.diagnostics?.some((d) => d.code === 'print/command-missing')).toBe(false);
+  });
 });

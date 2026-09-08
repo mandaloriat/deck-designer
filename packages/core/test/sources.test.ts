@@ -166,3 +166,68 @@ describe('data source validation', () => {
     },
   );
 });
+
+describe('structural problems in a source', () => {
+  const REQUIRED = `version: 1
+name: Sources
+card: { width: 63, height: 88 }
+cardTypes:
+  - id: unit
+    template: templates/unit.liquid
+    data: data/units
+    fields:
+      name: { type: text, required: true }
+      cost: { type: integer, default: 0 }
+`;
+
+  it('reports a header typo once, not once per row', async () => {
+    // Forty rows used to mean forty identical warnings and forty errors,
+    // burying the single fact that the column is misspelled.
+    const rows = Array.from({ length: 20 }, (_, i) => `Alpha ${i},1`).join('\n');
+    const { diagnostics, cleanup } = await load({ 'data/units/a.csv': `nmae,cost\n${rows}\n` }, REQUIRED);
+    try {
+      expect(diagnostics.filter((d) => d.code === 'data/unknown-field')).toHaveLength(1);
+      expect(diagnostics.filter((d) => d.code === 'data/missing-column')).toHaveLength(1);
+      expect(diagnostics.filter((d) => d.code === 'data/required')).toHaveLength(0);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('names the near miss, counting a swap as one typo', async () => {
+    const { diagnostics, cleanup } = await load({ 'data/units/a.csv': 'nmae,cost\nAlpha,1\n' }, REQUIRED);
+    try {
+      const missing = diagnostics.find((d) => d.code === 'data/missing-column');
+      expect(missing?.hint).toBe('Did you mean the "nmae" column?');
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('has its own diagnostic for a column with no heading', async () => {
+    const { diagnostics, cleanup } = await load({ 'data/units/a.csv': 'name,\nAlpha,x\n' }, REQUIRED);
+    try {
+      expect(diagnostics.some((d) => d.code === 'data/unnamed-column')).toBe(true);
+      expect(diagnostics.some((d) => d.message.includes('""'))).toBe(false);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('still reports a row whose required value is blank when the column exists', async () => {
+    // The whole point of collapsing the structural case is to keep this one
+    // legible, so it has to survive.
+    const { diagnostics, cleanup } = await load(
+      { 'data/units/a.csv': 'name,cost\nAlpha,1\n,2\nGamma,3\n' },
+      REQUIRED,
+    );
+    try {
+      const required = diagnostics.filter((d) => d.code === 'data/required');
+      expect(required).toHaveLength(1);
+      expect(required[0]?.message).toContain('Row 3');
+      expect(diagnostics.some((d) => d.code === 'data/missing-column')).toBe(false);
+    } finally {
+      await cleanup();
+    }
+  });
+});
