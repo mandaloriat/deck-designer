@@ -3,10 +3,18 @@
 A 40-card Italian deck: four suits of ten, reduced to geometry. All artwork in
 this directory is original, drawn as SVG for this project.
 
+    deck preview -p examples/briscola
     deck validate -p examples/briscola
     deck build -p examples/briscola
     deck print-plan -p examples/briscola --page A4 --margin 6
     sh examples/briscola/dist/print/print-cards.sh
+
+| | | | |
+|:---:|:---:|:---:|:---:|
+| ![Asso di denari](preview/denari-01.png) | ![Tre di coppe](preview/coppe-03.png) | ![Sette di spade](preview/spade-07.png) | ![Cinque di bastoni](preview/bastoni-05.png) |
+| Asso di denari | Tre di coppe | Sette di spade | Cinque di bastoni |
+| ![Fante di denari](preview/denari-08.png) | ![Cavallo di coppe](preview/coppe-09.png) | ![Re di spade](preview/spade-10.png) | ![Dorso](preview/bastoni-01.back.png) |
+| Fante di denari | Cavallo di coppe | Re di spade | Dorso |
 
 ## What it is
 
@@ -40,6 +48,17 @@ double ring for the knave, rays for the horse, a beaded crown for the king.
 
 Type is EB Garamond, vendored under the SIL Open Font License (see
 `fonts/OFL.txt`), so the deck renders identically wherever it is built.
+
+## The images above
+
+They are built by the tool, at 150dpi instead of the 300 the deck prints at.
+Regenerate them after a design change with:
+
+    deck export -p examples/briscola --face front --dpi 150 \
+      --out examples/briscola/preview --name '{id}.png' \
+      --id denari-01 coppe-03 spade-07 bastoni-05 denari-08 coppe-09 spade-10
+    deck export -p examples/briscola --id bastoni-01 --face back --dpi 150 \
+      --out examples/briscola/preview --name '{id}.back.png'
 
 ## What it exercises
 

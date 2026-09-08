@@ -11,3 +11,5 @@ export * from './commands/print-plan.js';
 export * from './commands/init.js';
 export * from './commands/doctor.js';
 export * from './commands/watch.js';
+export * from './commands/preview.js';
+export * from './preview/server.js';
