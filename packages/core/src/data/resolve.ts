@@ -44,6 +44,8 @@ export async function resolveCards(project: Project, options: ResolveOptions = {
       );
     }
 
+    const structural = inspectSources(project, type, rows, diagnostics);
+
     let index = 0;
     for (const row of rows) {
       const file = projectRelative(project.root, row.file);
@@ -76,23 +78,15 @@ export async function resolveCards(project: Project, options: ResolveOptions = {
       const values: Record<string, CardValue> = {};
       const view: Record<string, CardValue> = {};
 
-      for (const key of Object.keys(merged)) {
-        if ((RESERVED_FIELDS as readonly string[]).includes(key)) continue;
-        if (!(key in type.fields)) {
-          diagnostics.push(
-            diag('warning', 'data/unknown-field', `Unknown field "${key}" ignored.`, {
-              file,
-              cardType: type.id,
-              hint: `Declare it under cardTypes[id=${type.id}].fields to use it in templates.`,
-            }),
-          );
-        }
-      }
+      const absent = structural.get(row.file);
 
       for (const [name, def] of Object.entries(type.fields)) {
         const rawValue = merged[name];
         const context = { file, cardType: type.id, field: name, row: row.row };
-        const coerced = coerce(rawValue, def, name, context, diagnostics);
+        // A field with no column at all was already reported once against the
+        // source; repeating it per row would bury everything else.
+        const reportRequired = !absent?.has(name);
+        const coerced = coerce(rawValue, def, name, context, diagnostics, reportRequired);
         values[name] = coerced;
         view[name] = await toView(coerced, def, project, { checkAssets, assetCache, context, diagnostics });
       }
@@ -128,6 +122,117 @@ export async function resolveCards(project: Project, options: ResolveOptions = {
   }
 
   return { cards, diagnostics };
+}
+
+/**
+ * Reports what is wrong with a source rather than with a row: a column nobody
+ * declared, a column with no name, a declared field the source never supplies.
+ * One header typo used to produce two diagnostics per row, which on a forty-card
+ * deck meant eighty lines hiding the one fact that mattered.
+ *
+ * Returns, per source file, the required fields that have no column at all, so
+ * the row pass can stay quiet about them.
+ */
+function inspectSources(
+  project: Project,
+  type: ResolvedCardType,
+  rows: readonly RawRow[],
+  diagnostics: Diagnostic[],
+): Map<string, Set<string>> {
+  const keysByFile = new Map<string, Set<string>>();
+  for (const row of rows) {
+    const keys = keysByFile.get(row.file) ?? new Set<string>();
+    for (const key of Object.keys(normaliseKeys(row.values))) keys.add(key);
+    if (row.body !== undefined && type.bodyField) keys.add(type.bodyField);
+    keysByFile.set(row.file, keys);
+  }
+
+  const absentByFile = new Map<string, Set<string>>();
+
+  for (const [absolute, keys] of keysByFile) {
+    const file = projectRelative(project.root, absolute);
+
+    for (const key of keys) {
+      if ((RESERVED_FIELDS as readonly string[]).includes(key)) continue;
+      if (key in type.fields) continue;
+      if (key === '') {
+        diagnostics.push(
+          diag('warning', 'data/unnamed-column', 'A column has an empty name; its values are ignored.', {
+            file,
+            cardType: type.id,
+            hint: 'Give the column a heading that matches a declared field, or remove it.',
+          }),
+        );
+        continue;
+      }
+      diagnostics.push(
+        diag('warning', 'data/unknown-field', `Unknown field "${key}" ignored.`, {
+          file,
+          cardType: type.id,
+          hint: `Declare it under cardTypes[id=${type.id}].fields to use it in templates, or check the spelling.`,
+        }),
+      );
+    }
+
+    const absent = new Set<string>();
+    for (const [name, def] of Object.entries(type.fields)) {
+      if (!def.required) continue;
+      if (name in type.defaults) continue;
+      if (keys.has(name)) continue;
+      absent.add(name);
+      diagnostics.push(
+        diag('error', 'data/missing-column', `No "${name}" column; every card here is missing a required field.`, {
+          file,
+          cardType: type.id,
+          hint: nearest(name, keys) ?? `Add a "${name}" column, or drop \`required\` from the field.`,
+        }),
+      );
+    }
+    absentByFile.set(absolute, absent);
+  }
+
+  return absentByFile;
+}
+
+/** Names a likely typo, which is what a missing column usually is. */
+function nearest(wanted: string, present: ReadonlySet<string>): string | undefined {
+  for (const candidate of present) {
+    if (candidate === '' || candidate === wanted) continue;
+    if (distance(wanted.toLowerCase(), candidate.toLowerCase()) <= Math.max(1, Math.floor(wanted.length / 4))) {
+      return `Did you mean the "${candidate}" column?`;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Optimal string alignment, not plain Levenshtein: swapping two adjacent
+ * letters is the typo people actually make, and it has to cost one edit for
+ * "suti" to suggest "suit".
+ */
+function distance(a: string, b: string): number {
+  if (Math.abs(a.length - b.length) > 3) return 99;
+  let beforePrevious: number[] = [];
+  let previous = Array.from({ length: b.length + 1 }, (_, i) => i);
+
+  for (let i = 1; i <= a.length; i += 1) {
+    const current = [i];
+    for (let j = 1; j <= b.length; j += 1) {
+      const substitution = a[i - 1] === b[j - 1] ? 0 : 1;
+      let best = Math.min(
+        (previous[j] as number) + 1,
+        (current[j - 1] as number) + 1,
+        (previous[j - 1] as number) + substitution,
+      );
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        best = Math.min(best, (beforePrevious[j - 2] as number) + 1);
+      }
+      current[j] = best;
+    }
+    beforePrevious = previous;
+    previous = current;
+  }
+  return previous[b.length] as number;
 }
 
 function normaliseKeys(values: Record<string, unknown>): Record<string, unknown> {
@@ -183,12 +288,13 @@ function coerce(
   name: string,
   ctx: Ctx,
   diagnostics: Diagnostic[],
+  reportRequired = true,
 ): CardValue {
   const where = { file: ctx.file, cardType: ctx.cardType };
   if (isEmpty(raw)) {
     const fallback = 'default' in def ? (def.default as CardValue | undefined) : undefined;
     if (fallback !== undefined) return fallback;
-    if (def.required) {
+    if (def.required && reportRequired) {
       diagnostics.push(
         diag('error', 'data/required', `Row ${ctx.row}: required field "${name}" is empty.`, where),
       );
