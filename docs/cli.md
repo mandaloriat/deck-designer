@@ -169,9 +169,16 @@ The diagnostics drawer shows what `deck validate` would report, live. A broken
 `deck.yaml` shows the parser error with its line and column instead of a blank
 page.
 
-It is a viewer, not an editor: the files stay the source of truth. Bind it to
-loopback unless you mean to expose the project directory, because it serves
-that directory over HTTP.
+The theme panel edits the custom properties the project lists under `theme:`.
+Dragging a slider or a colour picker updates the frame live; releasing it writes
+the value into the stylesheet that declares it, and the watcher reloads from
+there. So it edits your files rather than shadowing them, and the stylesheet
+stays the source of truth. See [Theme](project-format.md#theme).
+
+Writing is offered only on loopback. Bound to any other interface the panel goes
+read-only and the endpoint refuses, because the preview already serves the
+project directory over HTTP and a write endpoint raises that from reading your
+files to changing them.
 
 ## deck watch
 

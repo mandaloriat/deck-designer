@@ -22,6 +22,17 @@ fonts:
 styles:
   - templates/base.css
 
+# What the preview offers as controls. The stylesheet still holds the values;
+# these names just say which of them are meant to be tuned by hand.
+theme:
+  - --ink
+  - --paper
+  - { name: --denari, label: Denari }
+  - { name: --coppe, label: Coppe }
+  - { name: --spade, label: Spade }
+  - { name: --bastoni, label: Bastoni }
+  - { name: --frame-inset, label: Frame inset, min: 1, max: 8 }
+
 cardTypes:
   - id: card
     name: Carta

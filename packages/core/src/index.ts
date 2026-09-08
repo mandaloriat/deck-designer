@@ -13,3 +13,5 @@ export * from './util/units.js';
 export * from './util/paths.js';
 export * from './util/errors.js';
 export * from './util/html.js';
+export * from './theme/variables.js';
+export * from './theme/resolve.js';

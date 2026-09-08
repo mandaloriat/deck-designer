@@ -9,6 +9,8 @@
   --coppe: #97292f;
   --spade: #2c4a76;
   --bastoni: #35633f;
+  /* How far the double rule sits inside the trim edge. */
+  --frame-inset: 3mm;
 }
 
 .dd-card {

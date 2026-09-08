@@ -34,6 +34,10 @@ fonts:               # vendored files only; remote URLs are rejected
 styles:              # CSS applied to every card type
   - templates/base.css
 
+theme:               # custom properties the preview offers as controls
+  - --ink
+  - { name: --frame-inset, label: Frame inset, min: 1, max: 8 }
+
 icons:
   dir: assets/icons  # files here become [[token]] in rich text
   extensions: [svg, png, webp]
@@ -209,6 +213,39 @@ custom properties — `--dd-w`, `--dd-h`, `--dd-bleed`, `--dd-safe`, `--dd-radiu
 Because several component types can share one rendered page, scope type-specific
 rules (`.dd-card[data-type='creature'] .title`) rather than styling bare element
 names.
+
+### Theme
+
+A `theme` list names the custom properties the preview should offer as controls.
+The stylesheet keeps the values; the list only says which of them are meant to
+be tuned by hand.
+
+```yaml
+theme:
+  - --ink
+  - --paper
+  - { name: --frame-inset, label: Frame inset, min: 1, max: 8 }
+```
+
+An entry is a bare name, or an object with `label`, `min` and `max`. The control
+is inferred from whatever the stylesheet currently holds: a colour value gets a
+picker, a length or a number gets a number field, and a number field becomes a
+slider when the entry declares both `min` and `max`. Anything else is a text
+field, so a font stack is still editable.
+
+The panel writes the value straight back into the stylesheet that declares it,
+touching that one declaration and leaving formatting, comments and ordering
+alone. That is the whole reason the knobs are custom properties: a key and a
+value round-trip safely, where rewriting rendered markup would not.
+
+A name nothing declares is reported as `theme/not-declared` rather than shown as
+an empty control, and a name declared in several stylesheets is reported as
+`theme/shadowed` with the file the cascade actually uses, which is the one the
+panel edits.
+
+Editing is offered only when the preview is bound to loopback. On any other
+interface the panel is read-only, because a write endpoint reachable from the
+network is a different proposition from a directory served read-only.
 
 ### Text that fits
 
