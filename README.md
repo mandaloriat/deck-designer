@@ -52,7 +52,8 @@ locale, timezone and font hinting. A build that works on your laptop works in CI
 save, rendering the same document the exporter composes rather than an
 approximation of it, with the validator's diagnostics live alongside. A deck can
 list the custom properties it means to be tuned, and the preview turns them into
-colour pickers and sliders that write back into the stylesheet.
+colour pickers and sliders that write back into the stylesheet. One button
+exports what you are looking at, through the same renderer the CLI uses.
 
 **Machine-readable everything.** Every command takes `--json` and returns a stable
 envelope with diagnostics carrying error codes. Exit codes distinguish a crash (1)

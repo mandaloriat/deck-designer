@@ -2,6 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
+import { resolveChromiumPath } from '@deck-designer/render';
 import {
   cardElement,
   collectCss,
@@ -10,6 +11,7 @@ import {
   htmlDocument,
   isSubPath,
   loadProject,
+  projectRelative,
   rasterFrame,
   resolveCards,
   resolveInProject,
@@ -22,6 +24,9 @@ import {
   type Project,
   type ThemeVariable,
 } from '@deck-designer/core';
+import { renderToDisk } from '../images.js';
+import { DEFAULT_NAME_PATTERN } from '../naming.js';
+import { Reporter } from '../output.js';
 import { CHROME_PAGE } from './page.js';
 
 const MIME: Record<string, string> = {
@@ -73,6 +78,7 @@ interface Snapshot {
 export async function startPreviewServer(options: PreviewServerOptions): Promise<PreviewServer> {
   const clients = new Set<http.ServerResponse>();
   const WRITABLE = isLoopback(options.host);
+  let exporting = false;
 
   const load = async (): Promise<Snapshot> => {
     const project = await loadProject({ cwd: options.root });
@@ -100,6 +106,7 @@ export async function startPreviewServer(options: PreviewServerOptions): Promise
     }
 
     if (route === '/__preview/theme') return writeTheme(req, res);
+    if (route === '/__preview/export') return exportImages(req, res);
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       res.statusCode = 405;
       res.end('method not allowed');
@@ -156,6 +163,9 @@ export async function startPreviewServer(options: PreviewServerOptions): Promise
         })),
         theme: theme.variables,
         themeWritable: WRITABLE,
+        // The preview itself needs no browser; the export button does, so the
+        // button can say why it is unavailable instead of failing on click.
+        exportable: WRITABLE ? chromium() : { ok: false, reason: NOT_LOOPBACK },
         diagnostics: [...snapshot.diagnostics, ...theme.diagnostics],
       }),
     );
@@ -222,6 +232,84 @@ export async function startPreviewServer(options: PreviewServerOptions): Promise
 
     res.statusCode = 200;
     send(res, MIME['.json'] as string, JSON.stringify({ name, value: value.trim(), file: variable.file }));
+  }
+
+  /**
+   * Renders the current selection to PNG, into the project's own output
+   * directory, exactly as `deck export` would. The point is that the loop ends
+   * where it started: you tune a colour, you look at it, and the files are
+   * written without leaving the page.
+   */
+  async function exportImages(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+    if (req.method !== 'POST') return fail(res, 405, 'preview/method', 'Use POST to export.');
+    if (!WRITABLE) return fail(res, 403, 'preview/not-loopback', NOT_LOOPBACK);
+    if (!/^application\/json\b/i.test(req.headers['content-type'] ?? '')) {
+      return fail(res, 415, 'preview/content-type', 'Export requests must be application/json.');
+    }
+    const origin = req.headers.origin;
+    if (origin !== undefined && origin !== `http://${req.headers.host ?? ''}`) {
+      return fail(res, 403, 'preview/origin', `Refusing an export from ${origin}.`);
+    }
+    // Rendering opens a browser and writes a directory. Two at once would race
+    // on the same filenames, and the button is easy to double-click. Claimed
+    // before the first await: a check further down would leave a window in
+    // which two requests both passed it.
+    if (exporting) return fail(res, 409, 'preview/export-busy', 'An export is already running.');
+    exporting = true;
+    try {
+      const available = chromium();
+      if (!available.ok) return fail(res, 503, 'render/chromium-missing', available.reason);
+
+      let request: ExportRequest;
+      try {
+        request = JSON.parse(await readBody(req)) as ExportRequest;
+      } catch (error) {
+        return fail(res, 400, 'preview/bad-request', error instanceof Error ? error.message : String(error));
+      }
+
+      let snapshot: Snapshot;
+      try {
+        snapshot = await load();
+      } catch (error) {
+        const described = describe(error);
+        return fail(res, 409, described.code, described.message);
+      }
+
+      const cards = select(snapshot.cards, selectionUrl(request));
+      if (cards.length === 0) {
+        return fail(res, 409, 'select/empty', 'No components match the current filter.');
+      }
+
+      const outDir = path.join(snapshot.project.outputDir, 'cards');
+      const written = await renderToDisk(
+        {
+          project: snapshot.project,
+          cards,
+          faces: faceList(request.faces),
+          outDir,
+          pattern: DEFAULT_NAME_PATTERN,
+          // Guides are an inspection overlay, so they are deliberately not
+          // carried over: a crop mark baked into a print file is found late.
+          flags: { bleed: request.bleed === true, rounded: request.rounded === true, guides: false },
+        },
+        QUIET,
+      );
+      send(
+        res,
+        MIME['.json'] as string,
+        JSON.stringify({
+          out: projectRelative(snapshot.project.root, outDir),
+          dpi: written.dpi,
+          files: written.files.length,
+          diagnostics: written.diagnostics,
+        }),
+      );
+    } catch (error) {
+      const described = describe(error);
+      return fail(res, 500, described.code, described.message);
+    } finally {
+      exporting = false;
+    }
   }
 
   function fail(res: http.ServerResponse, status: number, code: string, message: string): void {
@@ -337,6 +425,42 @@ export async function startPreviewServer(options: PreviewServerOptions): Promise
         server.close(() => resolve());
       }),
   };
+}
+
+interface ExportRequest {
+  type?: string;
+  search?: string;
+  faces?: string;
+  bleed?: boolean;
+  rounded?: boolean;
+}
+
+/** Reuses the gallery's selection logic, so what is exported is what is shown. */
+function selectionUrl(request: ExportRequest): URL {
+  const url = new URL('http://preview.invalid/');
+  if (request.type) url.searchParams.set('type', request.type);
+  if (request.search) url.searchParams.set('search', request.search);
+  return url;
+}
+
+function faceList(faces: string | undefined): Face[] {
+  const wanted = (faces ?? 'front,back').split(',').filter((f): f is Face => f === 'front' || f === 'back');
+  return wanted.length > 0 ? wanted : ['front'];
+}
+
+/** Progress from the renderer has nowhere to go in a server; the reply carries it. */
+const QUIET = new Reporter({ json: false, quiet: true, color: false });
+
+const NOT_LOOPBACK = 'Exporting is disabled when the preview is not bound to loopback.';
+
+/** Resolved per request, so installing a browser mid-session enables the button. */
+function chromium(): { ok: true } | { ok: false; reason: string } {
+  try {
+    resolveChromiumPath();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 /** Only a preview nobody else can reach is allowed to write to the project. */
